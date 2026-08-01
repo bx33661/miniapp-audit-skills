@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "source_dir=<path> output_dir=<path> [trace_depth=10]"
-  output_schema: "../wxray-shared/schemas/dataflow-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/dataflow-output.schema.json"
 allowed-tools:
   - Bash
   - Read
@@ -29,7 +29,7 @@ Source → [Transform₁] → [Transform₂] → ... → [Guard?] → Sink
 - ⚠️ Risky: Source → Guard (弱) → Sink  
 - ❌ Vulnerable: Source → (无 Guard) → Sink
 
-**规则配置**: 所有模式定义位于 `../wxray-shared/rules/dataflow/`
+**规则配置**: 所有模式定义位于 `../miniapp-audit-shared/rules/dataflow/`
 - `source-patterns.json` - 数据入口点模式
 - `sink-patterns.json` - 危险操作点模式
 - `transform-patterns.json` - 数据变换模式
@@ -48,7 +48,7 @@ Source → [Transform₁] → [Transform₂] → ... → [Guard?] → Sink
 
 ### 步骤 2: 加载规则文件
 
-从 `../wxray-shared/rules/dataflow/` 加载以下 JSON 规则文件：
+从 `../miniapp-audit-shared/rules/dataflow/` 加载以下 JSON 规则文件：
 - `source-patterns.json` - 数据入口点模式
 - `sink-patterns.json` - 危险操作点模式
 - `transform-patterns.json` - 数据变换模式
@@ -439,7 +439,7 @@ function getCWE(vulnerability) {
 - ⚠️ **启发式算法**：基于模式匹配，非完整符号执行
 - ⚠️ **需人工复核**：Guard 有效性需结合业务逻辑判断
 
-**详细算法说明**: 见 `../wxray-shared/docs/dataflow-algorithm.md`
+**详细算法说明**: 见 `../miniapp-audit-shared/docs/dataflow-algorithm.md`
 
 ## 输出文件
 

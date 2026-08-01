@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "source_dir=<path> output_dir=<path> [scope=full|api_only|sensitive_api_only]"
-  output_schema: "../wxray-shared/schemas/attack-surface-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/attack-surface-output.schema.json"
 allowed-tools:
   - Bash
   - Read

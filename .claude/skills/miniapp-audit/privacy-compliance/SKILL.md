@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "source_dir=<path> output_dir=<path> attack_surface=<path>"
-  output_schema: "../wxray-shared/schemas/privacy-compliance-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/privacy-compliance-output.schema.json"
 allowed-tools:
   - Bash
   - Read
@@ -20,8 +20,8 @@ allowed-tools:
 ## 法规参考
 
 详细条款见：
-- `../wxray-shared/rules/privacy/pipl-rules.md` - PIPL 完整条款
-- `../wxray-shared/rules/privacy/wechat-privacy-spec.md` - 微信小程序隐私规范
+- `../miniapp-audit-shared/rules/privacy/pipl-rules.md` - PIPL 完整条款
+- `../miniapp-audit-shared/rules/privacy/wechat-privacy-spec.md` - 微信小程序隐私规范
 
 ## 执行流程
 

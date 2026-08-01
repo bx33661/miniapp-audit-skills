@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "source_dir=<path> output_dir=<path> [scope=full|credentials_only|pii_only]"
-  output_schema: "../wxray-shared/schemas/secret-scan-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/secret-scan-output.schema.json"
 allowed-tools:
   - Bash
   - Read

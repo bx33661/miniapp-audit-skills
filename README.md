@@ -12,6 +12,34 @@ A comprehensive security audit toolkit for WeChat Mini Programs, powered by Clau
 - **Declarative Design**: Skills use instructional style, telling agents what to do rather than how
 - **Code Restoration**: Industry-first agent-level decompiled code restoration for improved audit accuracy
 
+## Installation
+
+### Option 1: Git Clone (Recommended)
+
+```bash
+cd ~/.claude/skills
+git clone https://github.com/bx33661/miniapp-audit-skills.git
+```
+
+After cloning, the skills will be available at `~/.claude/skills/miniapp-audit-skills/.claude/skills/`
+
+### Option 2: Git Submodule
+
+If you're managing multiple skill sets:
+
+```bash
+cd ~/.claude/skills
+git submodule add https://github.com/bx33661/miniapp-audit-skills.git
+```
+
+### Verify Installation
+
+Restart Claude Desktop/Code, then check if skills are loaded:
+
+```
+/miniapp-audit-audit --help
+```
+
 ## Quick Start
 
 ### Prerequisites
@@ -20,15 +48,7 @@ A comprehensive security audit toolkit for WeChat Mini Programs, powered by Clau
 - Node.js 18+ (for code analysis)
 - WeChat Mini Program unpacking tool (e.g., [unwxapkg](https://github.com/wxappunpacker/unwxapkg))
 
-### Installation
-
-Clone this repository to your Claude Skills directory:
-
-```bash
-git clone https://github.com/bx33661/miniapp-audit-skills.git ~/.claude/skills/miniapp-audit-skills
-```
-
-### Usage
+### Basic Usage
 
 **Standard audit (recommended)**:
 ```
@@ -126,7 +146,7 @@ miniapp-audit-{timestamp}/
 
 ### Shared Rules and Documentation
 
-The `wxray-shared/` directory contains shared rules and documentation used by all skills:
+The `miniapp-audit-shared/` directory contains shared rules and documentation used by all skills:
 
 - `rules/dataflow/` - Data flow analysis rules (source/sink/transform/guard patterns)
 - `rules/privacy/` - Privacy compliance specifications (PIPL, WeChat guidelines)
@@ -148,10 +168,32 @@ To enable dynamic testing, create `test-env.json`:
 }
 ```
 
-## Architecture Principles
+## Architecture
+
+```
+.claude/skills/
+├── miniapp-audit/           # 11 audit skills
+│   ├── audit/              # Main orchestrator
+│   ├── material-check/     # Material integrity
+│   ├── attack-surface/     # Attack surface analysis
+│   ├── secret-scan/        # Credential scanning
+│   ├── authz-analyzer/     # Authorization analysis
+│   ├── payment-audit/      # Payment security
+│   ├── dataflow-tracer/    # Data flow tracing
+│   ├── dynamic-tester/     # Dynamic testing
+│   ├── privacy-compliance/ # Privacy compliance
+│   ├── code-restorer/      # Code restoration
+│   ├── report-builder/     # Report generation
+│   └── shared/             # Schemas and rules
+└── miniapp-audit-shared/   # Shared resources
+    ├── rules/              # Detection rules
+    └── docs/               # Documentation
+```
+
+## Design Principles
 
 1. **Declarative/Instructional Style**: Skills tell agents what to do, not how to do it
-2. **Single Source of Truth**: Rules and standards centrally maintained in `wxray-shared/`
+2. **Single Source of Truth**: Rules and standards centrally maintained in shared directories
 3. **Agent Parallel Orchestration**: Large-scale analysis tasks executed in parallel
 4. **User-Friendly**: Interactive choices with transparent time and accuracy trade-offs
 

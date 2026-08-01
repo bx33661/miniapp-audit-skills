@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "test_env_config=<path> findings_dir=<path> output_dir=<path> [test_mode=safe|aggressive]"
-  output_schema: "../wxray-shared/schemas/dynamic-test-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/dynamic-test-output.schema.json"
 allowed-tools:
   - Bash
   - Read
@@ -24,8 +24,8 @@ allowed-tools:
 - 安全边界严格（环境白名单、速率限制、审计日志）
 - 多用户场景模拟（管理员、普通用户、跨用户测试）
 
-**配置模板**: `../wxray-shared/docs/test-env-template.json`  
-**安全规则**: `../wxray-shared/docs/dynamic-testing-safety.md`
+**配置模板**: `../miniapp-audit-shared/docs/test-env-template.json`  
+**安全规则**: `../miniapp-audit-shared/docs/dynamic-testing-safety.md`
 
 ## 执行流程
 

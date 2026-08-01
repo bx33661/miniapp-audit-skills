@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "input_path=<path> [output_dir=<path>]"
-  output_schema: "../wxray-shared/schemas/material-check-output.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/material-check-output.schema.json"
 allowed-tools:
   - Bash
   - Read

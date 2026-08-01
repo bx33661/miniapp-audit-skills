@@ -6,7 +6,7 @@ metadata:
   category: security-audit
   author: WxRay
   input_format: "source_dir=<path> output_dir=<path> attack_surface=<path>"
-  output_schema: "../wxray-shared/schemas/authz-findings.schema.json"
+  output_schema: "../miniapp-audit-shared/schemas/authz-findings.schema.json"
 allowed-tools:
   - Bash
   - Read
