@@ -1,50 +1,35 @@
 # MiniApp Audit Skills
 
-> 基于 Claude Agent 的微信小程序安全审计工具包
+> 基于 Agent 的微信小程序安全审计工具包
 
-一套全面的微信小程序安全审计工具包，基于 Claude Agent SDK 构建。提供模块化的 Skills，涵盖漏洞扫描、攻击面分析、合规检查和自动化报告生成。
+一套全面的微信小程序安全审计工具包，采用声明式 Skills 设计。提供模块化的审计能力，涵盖漏洞扫描、攻击面分析、合规检查和自动化报告生成。
 
 ## 特性
 
 - **全面覆盖**：攻击面分析、凭证扫描、权限分析、支付安全、数据流追踪、隐私合规
-- **Agent 驱动架构**：基于 Claude Agent SDK，支持智能分析和并行编排
+- **Agent 驱动架构**：支持智能分析和并行编排
 - **三种审计模式**：快速（5分钟）、标准（15分钟）、深度（30分钟）
 - **声明式设计**：Skills 采用指令式风格，告诉 Agent "做什么"而非"怎么做"
 - **代码还原功能**：行业首创的 Agent 级别反编译代码还原，提升审计准确度
 
 ## 安装
 
-### 方式一：Git Clone（推荐）
+将仓库克隆到你的 Skills 目录：
 
 ```bash
-cd ~/.claude/skills
+cd /path/to/your/skills/directory
 git clone https://github.com/bx33661/miniapp-audit-skills.git
 ```
 
-克隆后，Skills 将自动可用。
+克隆后，Skills 位于 `miniapp-audit-skills/.claude/skills/` 目录下。
 
-### 方式二：Git Submodule
-
-如果你在管理多个 Skill 集合：
-
-```bash
-cd ~/.claude/skills
-git submodule add https://github.com/bx33661/miniapp-audit-skills.git
-```
-
-### 验证安装
-
-重启 Claude Desktop/Code，然后检查 Skills 是否加载：
-
-```
-/miniapp-audit-audit --help
-```
+根据你的 Agent 环境配置，将该目录添加到 Skills 搜索路径。
 
 ## 快速开始
 
 ### 前置要求
 
-- Claude Desktop 或 Claude Code
+- 支持 Skills 的 Agent 环境
 - Node.js 18+（用于代码分析）
 - 微信小程序解包工具（如 [unwxapkg](https://github.com/wxappunpacker/unwxapkg)）
 
@@ -52,17 +37,17 @@ git submodule add https://github.com/bx33661/miniapp-audit-skills.git
 
 **标准审计**（推荐）：
 ```
-/miniapp-audit-audit source_dir=/path/to/miniapp
+调用 miniapp-audit-audit，参数：source_dir=/path/to/miniapp
 ```
 
 **快速扫描**：
 ```
-/miniapp-audit-audit source_dir=/path/to/miniapp mode=quick
+调用 miniapp-audit-audit，参数：source_dir=/path/to/miniapp mode=quick
 ```
 
 **深度分析**：
 ```
-/miniapp-audit-audit source_dir=/path/to/miniapp mode=deep
+调用 miniapp-audit-audit，参数：source_dir=/path/to/miniapp mode=deep
 ```
 
 ## Skills 列表
@@ -197,6 +182,13 @@ miniapp-audit-{timestamp}/
 3. **Agent 并行编排**：大规模分析任务并行执行
 4. **用户友好**：交互式选择，时间和准确度权衡透明
 
+## 兼容性
+
+本 Skills 套件采用标准的声明式设计，兼容支持 Skills 机制的 Agent 环境，包括但不限于：
+- Claude Desktop
+- Claude Code
+- 其他支持 Agent Skills 的平台
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。
@@ -207,6 +199,5 @@ MIT License
 
 ## 致谢
 
-- [Claude Agent SDK](https://docs.anthropic.com/claude/docs/agent-sdk) - Agent 编排框架
 - [unwxapkg](https://github.com/wxappunpacker/unwxapkg) - 微信小程序解包工具
 - 微信小程序安全社区
