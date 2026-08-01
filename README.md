@@ -200,7 +200,31 @@ miniapp-audit-{timestamp}/
 
 - 支持 Skills 的 Agent 环境
 - Node.js 18+（用于代码分析）
-- 微信小程序解包工具（如 [unwxapkg](https://github.com/wxappunpacker/unwxapkg)）
+- 微信小程序解包工具（推荐使用下方工具）
+
+## 推荐配套工具
+
+### [WxLocated](https://github.com/bx33661/WxLocated) - macOS 小程序缓存解析工具
+
+轻量、原生的 macOS 小程序缓存查看、源码重建与安全检查工具。
+
+**核心功能**：
+- 📂 自动扫描微信小程序缓存（支持 3.x/4.x 版本和多账户）
+- 🔓 原生解析标准 wxapkg 和 V1MMWX 加密缓存包
+- 🏗️ 静态重建完整源码结构（app.json、页面配置、JS、WXML、WXSS）
+- 🔍 内置安全检查：包完整性验证、SHA-256 哈希、敏感信息检测
+- 📊 源码质量分析：定位结构异常、编译器残留和待复核内容
+- 🌐 提取 API 调用、网络域名、请求参数等安全线索
+- 📦 一键导出重建工程和完整分析报告
+
+**典型工作流**：
+```
+WxLocated 解包 → miniapp-audit-skills 审计 → 完整安全报告
+```
+
+**系统要求**：macOS 13+ (Apple Silicon/Intel)
+
+[下载 WxLocated](https://github.com/bx33661/WxLocated/releases/latest) | [查看文档](https://github.com/bx33661/WxLocated)
 
 ## 许可证
 
