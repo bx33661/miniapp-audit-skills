@@ -1,0 +1,282 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dataflow Analysis Output Schema",
+  "description": "数据流追踪分析结果",
+  "type": "object",
+  "required": [
+    "skill",
+    "traced_at",
+    "source_dir",
+    "summary",
+    "findings"
+  ],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "dataflow-tracer"
+    },
+    "traced_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_dir": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["sources_found", "sinks_found", "flows_traced", "vulnerable_flows"],
+      "properties": {
+        "sources_found": {
+          "type": "integer",
+          "description": "发现的 Source 数量"
+        },
+        "sinks_found": {
+          "type": "integer",
+          "description": "发现的 Sink 数量"
+        },
+        "flows_traced": {
+          "type": "integer",
+          "description": "追踪到的数据流数量"
+        },
+        "vulnerable_flows": {
+          "type": "integer",
+          "description": "存在风险的数据流数量"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "vulnerability",
+          "severity",
+          "vulnerable",
+          "source",
+          "sink",
+          "dataflow"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "pattern": "^DF-\\d+$"
+          },
+          "vulnerability": {
+            "type": "string",
+            "enum": [
+              "SQL Injection",
+              "NoSQL Injection",
+              "Command Injection",
+              "XSS",
+              "Path Traversal",
+              "SSRF",
+              "Information Disclosure"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+          },
+          "vulnerable": {
+            "type": "boolean",
+            "description": "是否存在漏洞"
+          },
+          "source": {
+            "type": "object",
+            "required": ["type", "variable", "file", "line"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "query_param",
+                  "form_input",
+                  "storage_read",
+                  "network_response",
+                  "global_data"
+                ]
+              },
+              "variable": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          },
+          "sink": {
+            "type": "object",
+            "required": ["type", "file", "line", "vulnerability"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "sql_query",
+                  "nosql_query",
+                  "command_exec",
+                  "html_render",
+                  "file_operation",
+                  "http_request",
+                  "logging"
+                ]
+              },
+              "file": {
+                "type": "string"
+              },
+              "line": {
+                "type": "integer"
+              },
+              "vulnerability": {
+                "type": "string"
+              }
+            }
+          },
+          "dataflow": {
+            "type": "object",
+            "required": ["path", "transforms", "guards", "depth"],
+            "properties": {
+              "path": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["file", "line", "code"],
+                  "properties": {
+                    "file": {"type": "string"},
+                    "line": {"type": "integer"},
+                    "code": {"type": "string"}
+                  }
+                },
+                "description": "数据流经过的路径"
+              },
+              "transforms": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "safe", "code"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "string_concat",
+                        "string_append",
+                        "url_encode",
+                        "json_serialize",
+                        "string_replace",
+                        "trim",
+                        "parse_number"
+                      ]
+                    },
+                    "safe": {
+                      "type": "boolean",
+                      "description": "是否为安全的变换"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "description": "数据变换操作"
+              },
+              "guards": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "effectiveness", "code"],
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "type_check",
+                        "number_validation",
+                        "length_check",
+                        "regex_validation",
+                        "whitelist",
+                        "escape",
+                        "parameterized"
+                      ]
+                    },
+                    "effectiveness": {
+                      "type": "string",
+                      "enum": ["HIGH", "MEDIUM", "LOW"]
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "context": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "description": "防护措施"
+              },
+              "depth": {
+                "type": "integer",
+                "description": "数据流路径深度"
+              }
+            }
+          },
+          "risk_assessment": {
+            "type": "object",
+            "required": ["score", "factors", "has_effective_guard"],
+            "properties": {
+              "score": {
+                "type": "integer",
+                "description": "风险评分"
+              },
+              "factors": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "风险因素"
+              },
+              "has_effective_guard": {
+                "type": "boolean",
+                "description": "是否有有效防护"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sources_catalog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["source_id", "type", "variable", "file", "line"],
+        "properties": {
+          "source_id": {"type": "string"},
+          "type": {"type": "string"},
+          "variable": {"type": "string"},
+          "file": {"type": "string"},
+          "line": {"type": "integer"},
+          "code": {"type": "string"},
+          "risk_level": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      },
+      "description": "所有发现的 Source"
+    },
+    "sinks_catalog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sink_id", "type", "file", "line"],
+        "properties": {
+          "sink_id": {"type": "string"},
+          "type": {"type": "string"},
+          "file": {"type": "string"},
+          "line": {"type": "integer"},
+          "code": {"type": "string"},
+          "severity": {"type": "string"},
+          "vulnerability": {"type": "string"}
+        }
+      },
+      "description": "所有发现的 Sink"
+    }
+  }
+}

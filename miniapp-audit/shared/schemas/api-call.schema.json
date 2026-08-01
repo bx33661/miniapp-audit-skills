@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wxray.dev/schemas/api-call.schema.json",
+  "title": "API Call",
+  "description": "API 调用记录",
+  "type": "object",
+  "required": ["id", "type", "method", "url", "locations"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^API-[0-9]{3,}$",
+      "description": "API 唯一ID，格式：API-001"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["http", "websocket", "cloud_function", "cloud_database", "upload", "download", "graphql"],
+      "description": "API 类型"
+    },
+    "method": {
+      "type": "string",
+      "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "CALL"],
+      "description": "HTTP 方法或云函数 CALL"
+    },
+    "url": {
+      "type": "string",
+      "description": "完整 URL 或云函数名称"
+    },
+    "url_pattern": {
+      "type": "string",
+      "description": "规范化的 URL 模式（用于去重）",
+      "examples": ["/api/user/{id}", "/api/order/list"]
+    },
+    "params": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "参数列表"
+    },
+    "headers": {
+      "type": "object",
+      "description": "请求头（从代码中提取）",
+      "additionalProperties": {"type": "string"}
+    },
+    "auth": {
+      "type": "object",
+      "description": "认证信息",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["none", "bearer", "basic", "cookie", "custom", "unknown"],
+          "description": "认证类型"
+        },
+        "source": {
+          "type": "string",
+          "description": "Token/认证信息来源",
+          "examples": ["storage", "globalData", "hardcoded"]
+        },
+        "location": {
+          "type": "object",
+          "properties": {
+            "file": {"type": "string"},
+            "line": {"type": "integer"}
+          }
+        }
+      }
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["file", "line"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "调用位置的文件路径"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "调用位置的行号"
+          },
+          "context": {
+            "type": "string",
+            "description": "调用上下文（函数名、页面等）"
+          }
+        }
+      },
+      "description": "所有调用位置"
+    },
+    "wrapper": {
+      "type": "object",
+      "description": "请求封装信息",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["wx.request", "uni.request", "Taro.request", "axios", "fetch", "custom"],
+          "description": "封装类型"
+        },
+        "interceptor": {
+          "type": "object",
+          "description": "拦截器信息",
+          "properties": {
+            "file": {"type": "string"},
+            "line": {"type": "integer"},
+            "adds_auth": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "domain": {
+      "type": "string",
+      "description": "域名"
+    },
+    "protocol": {
+      "type": "string",
+      "enum": ["https", "http", "wss", "ws"],
+      "description": "协议"
+    },
+    "risk_indicators": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "no_auth",
+          "http_not_https",
+          "user_controlled_param",
+          "sensitive_data",
+          "third_party_domain"
+        ]
+      },
+      "description": "风险指示"
+    },
+    "related_findings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^F-[0-9]{3,}$"
+      },
+      "description": "关联的安全发现ID"
+    }
+  }
+}

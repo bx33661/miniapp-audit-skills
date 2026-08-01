@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Material Check Output Schema",
+  "description": "审计材料完整性检查结果",
+  "type": "object",
+  "required": [
+    "skill",
+    "scanned_at",
+    "input_path",
+    "material_type",
+    "completeness",
+    "metadata"
+  ],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "material-check"
+    },
+    "scanned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "检查时间戳"
+    },
+    "input_path": {
+      "type": "string",
+      "description": "输入路径（wxapkg 文件或源码目录）"
+    },
+    "material_type": {
+      "type": "string",
+      "enum": ["wxapkg", "wechat_cache", "decompiled_source", "unknown"],
+      "description": "材料类型"
+    },
+    "completeness": {
+      "type": "string",
+      "enum": ["COMPLETE", "PARTIAL", "CONFLICTED", "BLOCKED"],
+      "description": "完整性状态"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["app_id", "pages_count"],
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "description": "小程序 AppID"
+        },
+        "app_name": {
+          "type": "string",
+          "description": "小程序名称"
+        },
+        "pages_count": {
+          "type": "integer",
+          "description": "页面总数"
+        },
+        "subpackages_count": {
+          "type": "integer",
+          "description": "分包数量"
+        },
+        "plugins_count": {
+          "type": "integer",
+          "description": "插件数量"
+        }
+      }
+    },
+    "main_package": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["OK", "ISSUES"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "severity", "file", "impact"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "missing_entry",
+                  "missing_page_wxml",
+                  "missing_page_js",
+                  "missing_page_wxss",
+                  "corrupted_file"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+              },
+              "file": {
+                "type": "string",
+                "description": "缺失或损坏的文件"
+              },
+              "impact": {
+                "type": "string",
+                "description": "影响说明"
+              }
+            }
+          }
+        }
+      }
+    },
+    "subpackages": {
+      "type": "object",
+      "properties": {
+        "declared": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "app.json 中声明的分包"
+        },
+        "found": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "实际找到的分包"
+        },
+        "missing": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "缺失的分包"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "severity", "subpackage", "impact"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["missing_subpackage", "missing_subpackage_page"]
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["HIGH", "MEDIUM", "LOW"]
+              },
+              "subpackage": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "impact": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "properties": {
+        "declared": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "声明的插件"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "severity", "plugin", "impact"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "missing_plugin"
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["MEDIUM", "LOW"]
+              },
+              "plugin": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "impact": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "version_consistency": {
+          "type": "string",
+          "enum": ["OK", "ISSUES"]
+        },
+        "decompile_quality": {
+          "type": "string",
+          "enum": ["OK", "ISSUES"]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type", "severity", "impact"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "potential_version_mix",
+                  "corrupted_files",
+                  "unknown_sections"
+                ]
+              },
+              "severity": {
+                "type": "string",
+                "enum": ["HIGH", "MEDIUM", "LOW"]
+              },
+              "count": {
+                "type": "integer"
+              },
+              "impact": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "建议的下一步操作"
+    },
+    "coverage_notes": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "覆盖范围说明"
+    }
+  }
+}

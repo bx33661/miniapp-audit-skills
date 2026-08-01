@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wxray.dev/schemas/audit-session.schema.json",
+  "title": "Audit Session",
+  "description": "审计会话元数据",
+  "type": "object",
+  "required": ["session_id", "created_at", "mode", "input_path"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "审计会话唯一ID"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["quick", "standard", "deep", "custom"],
+      "description": "审计模式"
+    },
+    "input_path": {
+      "type": "string",
+      "description": "输入路径（wxapkg/缓存目录/源码）"
+    },
+    "focus": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "用户关注点"
+    },
+    "output_dir": {
+      "type": "string",
+      "description": "输出目录"
+    },
+    "material": {
+      "type": "object",
+      "description": "材料信息",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["wxapkg", "wechat_cache", "decompiled_source"],
+          "description": "材料类型"
+        },
+        "completeness": {
+          "type": "string",
+          "enum": ["COMPLETE", "PARTIAL", "CONFLICTED", "BLOCKED"],
+          "description": "完整性状态"
+        },
+        "app_id": {"type": "string"},
+        "app_name": {"type": "string"},
+        "version": {"type": "string"}
+      }
+    },
+    "skills_executed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "skill": {"type": "string"},
+          "started_at": {"type": "string", "format": "date-time"},
+          "completed_at": {"type": "string", "format": "date-time"},
+          "status": {
+            "type": "string",
+            "enum": ["success", "partial", "failed"]
+          },
+          "output_file": {"type": "string"}
+        }
+      },
+      "description": "已执行的 Skills"
+    },
+    "statistics": {
+      "type": "object",
+      "description": "统计信息",
+      "properties": {
+        "total_findings": {"type": "integer"},
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "CRITICAL": {"type": "integer"},
+            "HIGH": {"type": "integer"},
+            "MEDIUM": {"type": "integer"},
+            "LOW": {"type": "integer"},
+            "INFO": {"type": "integer"}
+          }
+        },
+        "apis_discovered": {"type": "integer"},
+        "files_scanned": {"type": "integer"}
+      }
+    }
+  }
+}

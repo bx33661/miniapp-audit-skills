@@ -1,0 +1,37 @@
+[
+  {
+    "type": "query_param",
+    "pattern": "options\\.(\\w+)",
+    "context": "onLoad function",
+    "risk": "HIGH",
+    "description": "页面 URL 参数"
+  },
+  {
+    "type": "form_input",
+    "pattern": "this\\.data\\.(\\w+)",
+    "context": "form submit",
+    "risk": "HIGH",
+    "description": "表单输入"
+  },
+  {
+    "type": "storage_read",
+    "pattern": "wx\\.getStorageSync\\(['\"]\\w+['\"]\\)",
+    "context": "any",
+    "risk": "MEDIUM",
+    "description": "本地存储读取"
+  },
+  {
+    "type": "network_response",
+    "pattern": "\\.then\\(\\s*(?:res|response)\\s*=>",
+    "context": "wx.request",
+    "risk": "MEDIUM",
+    "description": "网络请求响应"
+  },
+  {
+    "type": "global_data",
+    "pattern": "getApp\\(\\)\\.globalData\\.(\\w+)",
+    "context": "any",
+    "risk": "LOW",
+    "description": "全局数据"
+  }
+]

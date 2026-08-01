@@ -1,0 +1,252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wxray.dev/schemas/attack-surface-output.schema.json",
+  "title": "Attack Surface Output",
+  "description": "攻击面映射输出格式",
+  "type": "object",
+  "required": ["skill", "scanned_at", "source_dir", "metadata", "apis", "statistics"],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "attack-surface"
+    },
+    "scanned_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_dir": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "description": "AppID（脱敏）"
+        },
+        "app_name": {
+          "type": "string"
+        },
+        "framework": {
+          "type": "string",
+          "enum": ["native", "uni-app", "taro", "remax", "mpvue", "unknown"]
+        },
+        "base_lib_version": {
+          "type": "string"
+        },
+        "pages_count": {
+          "type": "integer"
+        },
+        "subpackages_count": {
+          "type": "integer"
+        },
+        "plugins_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "apis": {
+      "type": "array",
+      "items": {
+        "$ref": "../api-call.schema.json"
+      },
+      "description": "所有 API 调用"
+    },
+    "cloud_functions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^CF-[0-9]{3,}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "params": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "cloud_database": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "collection": {"type": "string"},
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["get", "add", "update", "remove", "count", "watch"]
+            }
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "sensitive_apis": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "api": {
+            "type": "string",
+            "description": "API 名称，如 wx.getLocation"
+          },
+          "category": {
+            "type": "string",
+            "enum": ["location", "identity", "contact", "media", "clipboard", "storage", "payment", "bluetooth", "other"]
+          },
+          "data_type": {
+            "type": "string",
+            "description": "收集的数据类型"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer"},
+                "context": {"type": "string"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "declared": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "app.json 中声明的权限"
+        },
+        "required_private_infos": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "requiredPrivateInfos 声明"
+        },
+        "used": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "实际调用的 API"
+        },
+        "undeclared": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "使用了但未声明的 API"
+        }
+      }
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "domain": {"type": "string"},
+          "protocol": {
+            "type": "string",
+            "enum": ["https", "http", "wss", "ws"]
+          },
+          "type": {
+            "type": "string",
+            "enum": ["request", "socket", "upload", "download"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["config", "code", "both"]
+          },
+          "first_seen": {
+            "type": "object",
+            "properties": {
+              "file": {"type": "string"},
+              "line": {"type": "integer"}
+            }
+          },
+          "is_third_party": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "webviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "page": {"type": "string"},
+          "src_type": {
+            "type": "string",
+            "enum": ["static", "dynamic", "user_controlled"]
+          },
+          "src": {"type": "string"},
+          "location": {
+            "type": "object",
+            "properties": {
+              "file": {"type": "string"},
+              "line": {"type": "integer"}
+            }
+          }
+        }
+      }
+    },
+    "request_wrappers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "file": {"type": "string"},
+          "line": {"type": "integer"},
+          "adds_base_url": {"type": "boolean"},
+          "adds_auth": {"type": "boolean"},
+          "has_interceptor": {"type": "boolean"},
+          "wrapped_api": {
+            "type": "string",
+            "enum": ["wx.request", "uni.request", "Taro.request", "axios", "fetch"]
+          }
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "total_apis": {"type": "integer"},
+        "http_apis": {"type": "integer"},
+        "websocket_apis": {"type": "integer"},
+        "cloud_functions": {"type": "integer"},
+        "cloud_database_collections": {"type": "integer"},
+        "sensitive_apis": {"type": "integer"},
+        "unique_domains": {"type": "integer"},
+        "third_party_domains": {"type": "integer"},
+        "webviews": {"type": "integer"},
+        "files_scanned": {"type": "integer"}
+      }
+    }
+  }
+}

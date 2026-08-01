@@ -1,0 +1,67 @@
+[
+  {
+    "type": "sql_query",
+    "patterns": [
+      "\\.query\\s*\\(\\s*['\"`].*?\\$\\{",
+      "\\.execute\\s*\\(\\s*['\"`].*?\\+",
+      "SELECT.*FROM.*WHERE.*\\+"
+    ],
+    "severity": "CRITICAL",
+    "vulnerability": "SQL Injection"
+  },
+  {
+    "type": "nosql_query",
+    "patterns": [
+      "\\.find\\s*\\(\\s*\\{[^}]*:\\s*\\w+[^}]*\\}\\s*\\)",
+      "\\.findOne\\s*\\(\\s*\\{[^}]*:\\s*\\w+[^}]*\\}\\s*\\)"
+    ],
+    "severity": "HIGH",
+    "vulnerability": "NoSQL Injection"
+  },
+  {
+    "type": "command_exec",
+    "patterns": [
+      "child_process\\.exec\\s*\\(",
+      "exec\\s*\\(\\s*['\"`].*?\\$\\{"
+    ],
+    "severity": "CRITICAL",
+    "vulnerability": "Command Injection"
+  },
+  {
+    "type": "html_render",
+    "patterns": [
+      "\\.innerHTML\\s*=",
+      "\\.setData\\s*\\(\\s*\\{.*?:\\s*`.*?\\$\\{"
+    ],
+    "severity": "HIGH",
+    "vulnerability": "XSS"
+  },
+  {
+    "type": "file_operation",
+    "patterns": [
+      "fs\\.readFile\\s*\\(\\s*\\w+",
+      "fs\\.writeFile\\s*\\(\\s*\\w+",
+      "wx\\.saveFile\\s*\\(\\s*\\{.*?filePath:\\s*\\w+"
+    ],
+    "severity": "HIGH",
+    "vulnerability": "Path Traversal"
+  },
+  {
+    "type": "http_request",
+    "patterns": [
+      "wx\\.request\\s*\\(\\s*\\{.*?url:\\s*\\w+",
+      "axios\\.\\w+\\s*\\(\\s*\\w+"
+    ],
+    "severity": "MEDIUM",
+    "vulnerability": "SSRF"
+  },
+  {
+    "type": "logging",
+    "patterns": [
+      "console\\.log\\s*\\(",
+      "logger\\.\\w+\\s*\\("
+    ],
+    "severity": "LOW",
+    "vulnerability": "Information Disclosure"
+  }
+]

@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wxray.dev/schemas/authz-findings.schema.json",
+  "title": "Authorization Analysis Output",
+  "description": "鉴权和越权分析输出格式",
+  "type": "object",
+  "required": ["skill", "scanned_at", "source_dir", "auth_mechanism", "identities", "resources", "findings"],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "authz-analyzer"
+    },
+    "scanned_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_dir": {
+      "type": "string"
+    },
+    "auth_mechanism": {
+      "type": "object",
+      "properties": {
+        "login_flow": {
+          "type": "object",
+          "properties": {
+            "entry": {"type": "string"},
+            "token_exchange_api": {"type": "string"},
+            "token_storage": {"type": "string"},
+            "refresh_mechanism": {"type": "string"}
+          }
+        },
+        "token_usage": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string", "enum": ["bearer", "cookie", "custom", "none"]},
+            "added_by": {"type": "string"},
+            "location": {"type": "string"}
+          }
+        }
+      }
+    },
+    "identities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "pattern": "^IDENTITY-[A-Z]+$"},
+          "type": {"type": "string", "enum": ["anonymous", "authenticated", "vip", "merchant", "admin", "tenant"]},
+          "description": {"type": "string"},
+          "source": {"type": "string", "enum": ["server", "storage", "globalData", "client_controlled"]},
+          "trust_client": {"type": "boolean"}
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "pattern": "^RES-[0-9]{3,}$"},
+          "type": {"type": "string", "enum": ["user_data", "order", "payment", "admin", "shared", "other"]},
+          "api": {"type": "string"},
+          "method": {"type": "string"},
+          "params": {"type": "array", "items": {"type": "string"}},
+          "sensitive_params": {"type": "array", "items": {"type": "string"}},
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer"}
+              }
+            }
+          }
+        }
+      }
+    },
+    "matrix": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "resource_id": {"type": "string"},
+          "identity": {"type": "string"},
+          "expected": {"type": "string", "enum": ["allow", "deny", "allow_own_only", "unknown"]},
+          "actual": {"type": "string", "enum": ["allow", "deny", "needs_verification", "unknown"]},
+          "risk": {"type": "string"}
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_id": {"type": "string", "pattern": "^AUTHZ-[0-9]{3,}$"},
+          "type": {
+            "type": "string",
+            "enum": [
+              "horizontal_privilege_escalation",
+              "vertical_privilege_escalation",
+              "auth_bypass",
+              "client_role_trust",
+              "missing_ownership_check"
+            ]
+          },
+          "severity": {"type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]},
+          "confidence": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+          "api": {"type": "string"},
+          "vulnerable_param": {"type": "string"},
+          "description": {"type": "string"},
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "file": {"type": "string"},
+                "line": {"type": "integer"}
+              }
+            }
+          },
+          "evidence_refs": {"type": "array", "items": {"type": "string"}},
+          "dataflow": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "object",
+                "properties": {
+                  "file": {"type": "string"},
+                  "line": {"type": "integer"},
+                  "type": {"type": "string"}
+                }
+              },
+              "guards": {
+                "type": "array",
+                "items": {"type": "string"}
+              },
+              "sink": {
+                "type": "object",
+                "properties": {
+                  "file": {"type": "string"},
+                  "line": {"type": "integer"},
+                  "type": {"type": "string"}
+                }
+              }
+            }
+          },
+          "test_case": {
+            "type": "object",
+            "properties": {
+              "id": {"type": "string"},
+              "description": {"type": "string"},
+              "prerequisites": {"type": "array", "items": {"type": "string"}},
+              "steps": {"type": "array"},
+              "expected": {"type": "string"},
+              "vulnerable_if": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "total_findings": {"type": "integer"},
+        "by_type": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        },
+        "identities_count": {"type": "integer"},
+        "resources_count": {"type": "integer"}
+      }
+    }
+  }
+}

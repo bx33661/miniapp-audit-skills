@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://wxray.dev/schemas/evidence.schema.json",
+  "title": "Evidence",
+  "description": "证据记录，追踪审计发现的来源",
+  "type": "object",
+  "required": ["evidence_id", "source_skill", "collected_at", "type"],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "pattern": "^EV-[0-9]{3,}$",
+      "description": "证据唯一ID，格式：EV-001"
+    },
+    "source_skill": {
+      "type": "string",
+      "description": "产生此证据的 Skill 名称",
+      "examples": ["secret-scan", "attack-surface", "authz-analyzer"]
+    },
+    "collected_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "证据收集时间（ISO 8601）"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["source_code", "config", "api_response", "tool_output", "dynamic_test"],
+      "description": "证据类型"
+    },
+    "artifact": {
+      "type": "object",
+      "description": "证据来源的制品信息",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "文件路径（相对于源码根目录）"
+        },
+        "line_start": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "起始行号"
+        },
+        "line_end": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "结束行号"
+        },
+        "hash": {
+          "type": "string",
+          "description": "文件内容的 SHA256 哈希"
+        }
+      }
+    },
+    "content_redacted": {
+      "type": "string",
+      "description": "证据内容（敏感值已脱敏）"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "额外元数据",
+      "properties": {
+        "tool": {
+          "type": "string",
+          "description": "使用的工具"
+        },
+        "rule_id": {
+          "type": "string",
+          "description": "匹配的规则ID"
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["HIGH", "MEDIUM", "LOW"],
+          "description": "置信度"
+        }
+      }
+    }
+  }
+}

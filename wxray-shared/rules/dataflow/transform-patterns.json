@@ -1,0 +1,37 @@
+[
+  {
+    "pattern": "\\.concat\\(",
+    "type": "string_concat",
+    "safe": false
+  },
+  {
+    "pattern": "\\+\\s*['\"`]",
+    "type": "string_append",
+    "safe": false
+  },
+  {
+    "pattern": "encodeURIComponent\\(",
+    "type": "url_encode",
+    "safe": true
+  },
+  {
+    "pattern": "JSON\\.stringify\\(",
+    "type": "json_serialize",
+    "safe": true
+  },
+  {
+    "pattern": "\\.replace\\(",
+    "type": "string_replace",
+    "safe": false
+  },
+  {
+    "pattern": "\\.trim\\(",
+    "type": "trim",
+    "safe": false
+  },
+  {
+    "pattern": "parseInt\\(|parseFloat\\(",
+    "type": "parse_number",
+    "safe": true
+  }
+]

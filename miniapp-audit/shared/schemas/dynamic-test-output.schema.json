@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dynamic Test Output Schema",
+  "description": "动态漏洞测试结果",
+  "type": "object",
+  "required": [
+    "skill",
+    "tested_at",
+    "environment",
+    "test_mode",
+    "summary",
+    "findings"
+  ],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "dynamic-tester"
+    },
+    "tested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "environment": {
+      "type": "string",
+      "description": "测试环境 base_url"
+    },
+    "test_mode": {
+      "type": "string",
+      "enum": ["safe", "aggressive"],
+      "description": "测试模式"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_tests", "vulnerable_confirmed", "false_positives", "blocked"],
+      "properties": {
+        "total_tests": {
+          "type": "integer",
+          "description": "总测试数"
+        },
+        "vulnerable_confirmed": {
+          "type": "integer",
+          "description": "确认存在漏洞的数量"
+        },
+        "false_positives": {
+          "type": "integer",
+          "description": "误报数量"
+        },
+        "blocked": {
+          "type": "integer",
+          "description": "被阻止的测试数量"
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "test_type", "status", "severity"],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "description": "关联的静态分析 finding_id"
+          },
+          "test_type": {
+            "type": "string",
+            "enum": [
+              "horizontal_privilege_escalation",
+              "vertical_privilege_escalation",
+              "sql_injection",
+              "nosql_injection",
+              "payment_price_tampering",
+              "session_management"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["CONFIRMED", "FALSE_POSITIVE", "BLOCKED", "SKIPPED"],
+            "description": "测试结果状态"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+          },
+          "evidence": {
+            "type": "object",
+            "description": "验证证据"
+          },
+          "reproduction": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "复现步骤"
+          }
+        }
+      }
+    },
+    "audit_log_path": {
+      "type": "string",
+      "description": "审计日志文件路径"
+    }
+  }
+}

@@ -1,0 +1,428 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Privacy Compliance Output Schema",
+  "description": "隐私合规检查结果",
+  "type": "object",
+  "required": [
+    "skill",
+    "checked_at",
+    "source_dir",
+    "regulations",
+    "summary",
+    "sections"
+  ],
+  "properties": {
+    "skill": {
+      "type": "string",
+      "const": "privacy-compliance"
+    },
+    "checked_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_dir": {
+      "type": "string"
+    },
+    "regulations": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "适用的法规列表",
+      "examples": [["PIPL", "GDPR", "WeChat Privacy Specification 2023"]]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_issues", "critical", "high", "medium", "review_required"],
+      "properties": {
+        "total_issues": {
+          "type": "integer"
+        },
+        "critical": {
+          "type": "integer"
+        },
+        "high": {
+          "type": "integer"
+        },
+        "medium": {
+          "type": "integer"
+        },
+        "review_required": {
+          "type": "integer",
+          "description": "需要人工审查的项目数"
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "required": [
+        "privacy_policy",
+        "permissions",
+        "data_collection",
+        "third_party_sdks",
+        "user_rights"
+      ],
+      "properties": {
+        "privacy_policy": {
+          "type": "object",
+          "required": ["status", "issues"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["PASS", "FAIL"]
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity", "issue", "regulation"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "missing_privacy_check",
+                      "missing_privacy_url",
+                      "missing_privacy_popup",
+                      "privacy_url_inaccessible"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+                  },
+                  "issue": {
+                    "type": "string"
+                  },
+                  "regulation": {
+                    "type": "string"
+                  },
+                  "fix": {
+                    "type": "string"
+                  },
+                  "recommendation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "permissions": {
+          "type": "object",
+          "required": ["status", "declared", "actual_used", "issues"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["PASS", "FAIL"]
+            },
+            "declared": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "在 requiredPrivateInfos 中声明的接口"
+            },
+            "actual_used": {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "代码中实际使用的隐私接口"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity", "api", "issue", "regulation"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "undeclared_privacy_api",
+                      "unused_privacy_declaration"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+                  },
+                  "api": {
+                    "type": "string"
+                  },
+                  "data_type": {
+                    "type": "string"
+                  },
+                  "used_in": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "issue": {
+                    "type": "string"
+                  },
+                  "regulation": {
+                    "type": "string"
+                  },
+                  "fix": {
+                    "type": "string"
+                  },
+                  "recommendation": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "data_collection": {
+          "type": "object",
+          "required": ["collected_data_types", "issues"],
+          "properties": {
+            "collected_data_types": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["api", "data_type", "sensitive", "category"],
+                "properties": {
+                  "api": {"type": "string"},
+                  "data_type": {"type": "string"},
+                  "sensitive": {"type": "boolean"},
+                  "category": {"type": "string"},
+                  "locations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "file": {"type": "string"},
+                        "line": {"type": "integer"}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "third_party_sharing": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {"type": "string"},
+                  "severity": {"type": "string"},
+                  "url": {"type": "string"},
+                  "domain": {"type": "string"},
+                  "location": {"type": "string"},
+                  "question": {"type": "string"},
+                  "regulation": {"type": "string"},
+                  "review_required": {"type": "boolean"}
+                }
+              }
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "sensitive_data_collection",
+                      "insecure_transmission",
+                      "third_party_data_sharing"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["HIGH", "MEDIUM", "LOW", "INFO"]
+                  },
+                  "data_type": {"type": "string"},
+                  "category": {"type": "string"},
+                  "url": {"type": "string"},
+                  "question": {"type": "string"},
+                  "regulation": {"type": "string"},
+                  "review_required": {"type": "boolean"},
+                  "fix": {"type": "string"}
+                }
+              }
+            }
+          }
+        },
+        "third_party_sdks": {
+          "type": "object",
+          "required": ["catalog", "issues"],
+          "properties": {
+            "catalog": {
+              "type": "object",
+              "required": ["packages", "plugins", "total_count"],
+              "properties": {
+                "packages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["package", "version", "name", "risk", "data_collected"],
+                    "properties": {
+                      "package": {"type": "string"},
+                      "version": {"type": "string"},
+                      "name": {"type": "string"},
+                      "risk": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+                      "data_collected": {"type": "string"}
+                    }
+                  }
+                },
+                "plugins": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["name", "config"],
+                    "properties": {
+                      "name": {"type": "string"},
+                      "config": {"type": "object"}
+                    }
+                  }
+                },
+                "total_count": {
+                  "type": "integer"
+                }
+              }
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "third_party_plugin"
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["INFO", "MEDIUM"]
+                  },
+                  "plugin": {"type": "string"},
+                  "provider": {"type": "string"},
+                  "version": {"type": "string"},
+                  "question": {"type": "string"},
+                  "regulation": {"type": "string"},
+                  "review_required": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        },
+        "user_rights": {
+          "type": "object",
+          "required": ["account_deletion", "data_export", "issues"],
+          "properties": {
+            "account_deletion": {
+              "type": "boolean",
+              "description": "是否实现账号注销功能"
+            },
+            "data_export": {
+              "type": "boolean",
+              "description": "是否实现数据导出功能"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "missing_account_deletion",
+                      "account_deletion_review",
+                      "missing_data_export"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["HIGH", "MEDIUM", "LOW", "INFO"]
+                  },
+                  "issue": {"type": "string"},
+                  "question": {"type": "string"},
+                  "checklist": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "regulation": {"type": "string"},
+                  "requirement": {"type": "string"},
+                  "recommendation": {"type": "string"},
+                  "review_required": {"type": "boolean"}
+                }
+              }
+            }
+          }
+        },
+        "child_protection": {
+          "type": "object",
+          "required": ["targets_children", "issues"],
+          "properties": {
+            "targets_children": {
+              "type": "boolean",
+              "description": "是否面向儿童"
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "severity"],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "children_targeted_app",
+                      "missing_parental_consent"
+                    ]
+                  },
+                  "severity": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "HIGH"]
+                  },
+                  "issue": {"type": "string"},
+                  "regulation": {"type": "string"},
+                  "requirements": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                  },
+                  "review_required": {"type": "boolean"},
+                  "fix": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "compliance_checklist": {
+      "type": "object",
+      "properties": {
+        "pipl_compliance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["article", "requirement", "status"],
+            "properties": {
+              "article": {"type": "string"},
+              "requirement": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": ["COMPLIANT", "NON_COMPLIANT", "PARTIAL", "NEEDS_REVIEW"]
+              },
+              "evidence": {"type": "array"},
+              "note": {"type": "string"}
+            }
+          }
+        },
+        "wechat_compliance": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["requirement", "status"],
+            "properties": {
+              "requirement": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": ["COMPLIANT", "NON_COMPLIANT", "NEEDS_REVIEW"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
