@@ -5,9 +5,9 @@ Usage:
   python extract_endpoints.py --root /path/to/miniapp
   python extract_endpoints.py --root /path/to/miniapp --output surface.json
 
-This is a discovery tool, not a complete AST analysis. It records the call
-site and the URL/name expression, and marks dynamic expressions for manual
-review. Use an AST pass when precision is required.
+The output follows assets/attack-surface-output.schema.json. It is a discovery
+tool, not a complete AST analysis; dynamic expressions and wrapped calls need
+manual review.
 """
 
 from __future__ import annotations
@@ -16,7 +16,9 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 CALL_RE = re.compile(
     r"\b("
@@ -29,6 +31,26 @@ URL_EXPR_RE = re.compile(r"\burl\s*:\s*([^,\n}]+)")
 NAME_EXPR_RE = re.compile(r"\bname\s*:\s*([^,\n}]+)")
 METHOD_RE = re.compile(r"\bmethod\s*:\s*['\"`]([^'\"`]+)['\"`]")
 WEBVIEW_RE = re.compile(r"<web-view\b[^>]*\bsrc\s*=\s*(['\"])(.*?)\1", re.S)
+APPID_RE = re.compile(r"wx[0-9a-f]{16}")
+
+
+def infer_app_id(root: Path) -> str | None:
+    for part in [root.name, *[parent.name for parent in root.parents]]:
+        match = APPID_RE.search(part)
+        if match:
+            return match.group(0)
+    return None
+
+
+def load_config(root: Path) -> dict:
+    for name in ("app.json", "app-config.json"):
+        path = root / name
+        if path.is_file():
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                return {}
+    return {}
 
 
 def literal(expr: str | None) -> str | None:
@@ -45,7 +67,6 @@ def is_dynamic(expr: str | None) -> bool:
 
 
 def matching_paren(text: str, open_index: int) -> int:
-    """Return the index of the ')' matching text[open_index] == '('."""
     depth = 0
     quote = None
     escape = False
@@ -85,11 +106,7 @@ def scan_js(path: Path, rel: str) -> dict:
         url_expr = URL_EXPR_RE.search(block)
         name_expr = NAME_EXPR_RE.search(block)
         method_match = METHOD_RE.search(block)
-        record = {
-            "file": rel,
-            "line": line_no,
-            "call": call,
-        }
+        record = {"file": rel, "line": line_no, "call": call}
         if call == "wx.cloud.callFunction":
             record["name"] = literal(name_expr.group(1)) if name_expr else None
             record["name_expression"] = name_expr.group(1).strip() if name_expr else None
@@ -105,8 +122,6 @@ def scan_js(path: Path, rel: str) -> dict:
         record["url_expression"] = url_expr.group(1).strip() if url_expr else None
         record["dynamic"] = is_dynamic(url_expr.group(1) if url_expr else None)
         record["method"] = method_match.group(1).upper() if method_match else None
-        if call == "wx.request" and record["method"] is None:
-            record["method"] = "GET"
         apis.append(record)
     return {"apis": apis, "cloud_functions": cloud, "navigation": navigation}
 
@@ -121,8 +136,7 @@ def scan_wxml(path: Path, rel: str) -> list[dict]:
             {
                 "file": rel,
                 "line": line_no,
-                "src": None if "{{" in src else src,
-                "src_expression": src,
+                "src": src,
                 "dynamic": "{{" in src,
             }
         )
@@ -141,9 +155,45 @@ def dedupe(records: list[dict], key_fields: tuple[str, ...]) -> list[dict]:
     return result
 
 
+def api_record(record: dict, index: int) -> dict:
+    call = record["call"]
+    if call == "wx.connectSocket":
+        api_type, method = "websocket", "CALL"
+    elif call == "wx.uploadFile":
+        api_type, method = "upload", "POST"
+    elif call == "wx.downloadFile":
+        api_type, method = "download", "GET"
+    else:
+        api_type, method = "http", record.get("method") or "GET"
+    url = record.get("url") or record.get("url_expression") or ""
+    host = urlparse(url).netloc if url.startswith(("http://", "https://", "ws://", "wss://")) else ""
+    return {
+        "id": f"API-{index:03d}",
+        "type": api_type,
+        "method": method,
+        "url": url,
+        "url_expression": record.get("url_expression"),
+        "dynamic": record.get("dynamic", False),
+        "call": call,
+        "domain": host,
+        "locations": [{"file": record["file"], "line": record["line"]}],
+    }
+
+
+def cloud_record(record: dict, index: int) -> dict:
+    return {
+        "id": f"CF-{index:03d}",
+        "name": record.get("name") or record.get("name_expression") or "",
+        "name_expression": record.get("name_expression"),
+        "params": [],
+        "locations": [{"file": record["file"], "line": record["line"]}],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract mini program attack surface")
     parser.add_argument("--root", required=True, help="decompiled mini program root")
+    parser.add_argument("--app-id", help="known mini program appid")
     parser.add_argument("--output", help="write JSON to this path instead of stdout")
     args = parser.parse_args()
 
@@ -152,33 +202,98 @@ def main() -> int:
         print(f"error: root is not a directory: {root}", file=sys.stderr)
         return 2
 
+    config = load_config(root)
     apis: list[dict] = []
     cloud: list[dict] = []
     navigation: list[dict] = []
     webviews: list[dict] = []
+    files_scanned = 0
 
     for path in sorted(root.rglob("*")):
         if not path.is_file():
             continue
         rel = str(path.relative_to(root))
         if path.suffix == ".js":
+            files_scanned += 1
             result = scan_js(path, rel)
             apis.extend(result["apis"])
             cloud.extend(result["cloud_functions"])
             navigation.extend(result["navigation"])
         elif path.suffix == ".wxml":
+            files_scanned += 1
             webviews.extend(scan_wxml(path, rel))
 
+    apis = [api_record(item, i + 1) for i, item in enumerate(dedupe(apis, ("call", "url", "url_expression", "method")))]
+    cloud = [cloud_record(item, i + 1) for i, item in enumerate(dedupe(cloud, ("name", "name_expression")))]
+    navigation = dedupe(navigation, ("url", "url_expression"))
+    webviews = dedupe(webviews, ("file", "line", "src"))
+
+    domains = {}
+    for item in apis:
+        host = item.get("domain")
+        if not host or host in domains:
+            continue
+        protocol = "wss" if item["type"] == "websocket" else "https"
+        domains[host] = {
+            "domain": host,
+            "protocol": protocol,
+            "type": "socket" if item["type"] == "websocket" else "request",
+            "source": "code",
+            "first_seen": item["locations"][0],
+            "is_third_party": False,
+        }
+
+    webview_records = [
+        {
+            "page": item["file"],
+            "src_type": "dynamic" if item["dynamic"] else "static",
+            "src": item["src"],
+            "location": {"file": item["file"], "line": item["line"]},
+        }
+        for item in webviews
+    ]
+
+    subpackages = config.get("subPackages") or config.get("subpackages") or []
+    plugins = config.get("plugins") or {}
+    permissions = config.get("permission") or {}
     payload = {
-        "root": str(root.resolve()),
-        "apis": dedupe(apis, ("call", "url", "url_expression", "method")),
-        "cloud_functions": dedupe(cloud, ("name", "name_expression")),
-        "navigation": dedupe(navigation, ("url", "url_expression")),
-        "webviews": dedupe(webviews, ("src", "src_expression")),
-        "limitations": [
-            "Line-based discovery; dynamic URL expressions require manual review.",
-            "Use an AST pass for precise extraction and data-flow analysis.",
-        ],
+        "skill": "attack-surface",
+        "scanned_at": datetime.now(timezone.utc).isoformat(),
+        "source_dir": str(root.resolve()),
+        "metadata": {
+            "app_id": args.app_id or config.get("appId") or config.get("appid") or infer_app_id(root) or "unknown",
+            "app_name": config.get("appName") or "",
+            "framework": "native",
+            "pages_count": len(config.get("pages") or []),
+            "subpackages_count": len(subpackages),
+            "plugins_count": len(plugins),
+        },
+        "apis": apis,
+        "cloud_functions": cloud,
+        "cloud_database": [],
+        "sensitive_apis": [],
+        "permissions": {
+            "declared": list(permissions.keys()),
+            "required_private_infos": config.get("requiredPrivateInfos") or [],
+            "used": [],
+            "undeclared": [],
+        },
+        "domains": list(domains.values()),
+        "webviews": webview_records,
+        "request_wrappers": [],
+        "navigation": navigation,
+        "statistics": {
+            "total_apis": len(apis),
+            "http_apis": sum(1 for item in apis if item["type"] == "http"),
+            "websocket_apis": sum(1 for item in apis if item["type"] == "websocket"),
+            "cloud_functions": len(cloud),
+            "cloud_database_collections": 0,
+            "sensitive_apis": 0,
+            "unique_domains": len(domains),
+            "third_party_domains": 0,
+            "webviews": len(webview_records),
+            "files_scanned": files_scanned,
+        },
     }
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     if args.output:

@@ -113,11 +113,14 @@ Trigger queries are stored in `evals/trigger-queries.csv`. Add output evals unde
 
 ### Adding a script
 
+Scripts are reserved for mechanical extraction that is high-volume, deterministic and error-prone by hand. Do not add scripts for redaction, simple field mapping, severity assignment or quality-gate checks; those belong in instructions and references.
+
 - Place it in the relevant skill's `scripts/` directory.
 - Use Python standard library or declare dependencies explicitly.
 - Accept all input through flags, environment variables or stdin; never prompt interactively.
 - Provide specific error messages and `--help`.
 - Add a validation step to the skill workflow.
+- Keep the audit script set small. The current set is `inventory.py` and `extract_endpoints.py`.
 
 ### Adding a skill
 
@@ -128,6 +131,15 @@ Trigger queries are stored in `evals/trigger-queries.csv`. Add output evals unde
 - Run the validator and the official `skills-ref` check.
 
 ## Version history
+
+### 2.0.2
+
+- Reduced audit scripts to `inventory.py` and `extract_endpoints.py`.
+- Removed `normalize_request.py`, `check_findings.py` and `check_coverage.py`; normalization, redaction and quality checks are instruction-led.
+- Rewrote `dynamic-testing.md` as a hypothesis matrix with `CONFIRMED / INCONCLUSIVE / BLOCKED / FALSE_POSITIVE`.
+- Merged severity guidance into `miniapp-audit/references/severity.md`.
+- Decoupled capture wording from a single vendor; removed `proxy_set` from allowed tools.
+- Removed edition-specific pricing and history claims from the Reqable reference.
 
 ### 2.0.1
 

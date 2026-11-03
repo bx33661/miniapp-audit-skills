@@ -1,13 +1,13 @@
 ---
 name: miniapp-dynamic
-description: "当在运行中的微信小程序里验证发现时使用：用 Reqable 抓包，重放与改参，测试多账号鉴权、支付和竞态条件。触发词：小程序抓包, Reqable, 重放, 越权验证, 支付测试, 动态验证."
+description: "当在运行中的微信小程序里验证发现时使用：用 Reqable 或等价抓包工具捕获流量，重放与改参，测试多账号鉴权、支付和竞态条件。触发词：小程序抓包, Reqable, 重放, 越权验证, 支付测试, 动态验证."
 license: MIT
-compatibility: "需要 Bash 和 HTTP 客户端。Reqable 可选，但推荐作为抓包层。手机测试可能需要 Reqable 协同模式。"
+compatibility: "需要 Bash 和 HTTP 客户端。Reqable 或等价抓包工具可选，推荐作为抓包层。手机测试可能需要抓包工具的协同模式。"
 metadata:
   version: "2.0"
   category: security-audit
   author: WxRay
-allowed-tools: Bash Read Write mcp__reqable_capture_live_filter mcp__reqable_capture_live_get_by_id mcp__reqable_capture_live_generate_curl mcp__reqable_capture_live_set_enabled mcp__reqable_proxy_set
+allowed-tools: Bash Read Write mcp__reqable_capture_live_filter mcp__reqable_capture_live_get_by_id mcp__reqable_capture_live_generate_curl mcp__reqable_capture_live_set_enabled
 ---
 
 # 微信小程序动态验证
@@ -34,7 +34,7 @@ allowed-tools: Bash Read Write mcp__reqable_capture_live_filter mcp__reqable_cap
 8. **记录证据。** 保存状态码、响应头、响应体、时间和完整请求；脱敏密钥和个人信息。
 9. **出现影响立即停止。** 如果测试暴露真实用户数据、改变资金或状态、或导致服务不稳定，停止并记录最小证据。
 
-脚本：`python scripts/normalize_request.py --record record.json --output template.json --redact` 生成回放模板。脚本不发送请求；回放和改参由审计者控制。
+请求归一化和改参规则见 `references/replay.md`。
 
 ## 防重放与签名
 
@@ -74,6 +74,8 @@ allowed-tools: Bash Read Write mcp__reqable_capture_live_filter mcp__reqable_cap
 
 - 只测试授权目标和账号。
 - 默认使用只读请求。
+- 抓包开关只在用户确认后切换。
+- 不擅自修改系统代理；抓包环境由用户确认。
 - 不执行真实支付、退款、删除或权限变更。
 - 遵守速率限制；出现错误或不稳定时停止。
 - 在所有证据中脱敏 Token、个人信息和密钥。

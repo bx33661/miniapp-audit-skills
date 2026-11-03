@@ -30,13 +30,13 @@ allowed-tools: Bash Read Write
 
 1. **识别材料类型。** 源码目录、wxapkg、客户端缓存或开发者工具导出。
 2. **获取材料。** 定位小程序缓存或包；记录客户端版本和账号。macOS 可用 WxLocated 扫描缓存并重建源码；Windows 常用 unveilr 或 wxappUnpacker。
-3. **解密与解包。** 处理标准和加密 wxapkg。PC 微信 3.9+ 的包可能需要先解密；记录工具和版本。
+3. **解密与解包。** 处理标准和加密 wxapkg。PC 微信 3.9+ 的包可能需要先解密；记录工具和版本。加密包或混淆 bundle 见 `references/obfuscated-bundle.md`。
 4. **校验结构。** 检查 `app.json`、`app.js`、页面文件、分包和插件，对比声明与实际内容。
 5. **建立清单。** 记录页面、组件、API、云环境、域名、SDK、source map、权限和隐私声明。
 6. **评估代码质量。** 记录混淆、压缩、缺失文件和反编译痕迹。判断是否需要代码还原；还原是辅助，不是证据。
 7. **记录限制。** 缺失的分包、插件、云函数或 source map 必须显式说明。
 
-脚本：`python scripts/inventory.py --root <dir> --output inventory.json` 生成第一版清单。脚本检查声明与文件，不判断业务完整性；结果需要人工复核。
+脚本：`python scripts/inventory.py --root <dir> --app-id <appid> --output inventory.json` 生成第一版清单。脚本检查声明与文件，不判断业务完整性；结果需要人工复核。
 
 ## 决策点
 
@@ -66,6 +66,7 @@ allowed-tools: Bash Read Write
 
 - `references/material-check.md` — 完整性检查和状态定义。
 - `references/code-restoration.md` — 谨慎的代码还原指引。
+- `references/obfuscated-bundle.md` — 加密包、混淆 bundle 和隔离执行边界。
 - `assets/material-check-output.schema.json` — 清单契约。
 
 ## 安全边界

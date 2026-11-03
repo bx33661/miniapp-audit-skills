@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.2 - 2026-11-03
+
+### Changed
+
+- Reduced audit scripts to `inventory.py` and `extract_endpoints.py`.
+- Removed `normalize_request.py`, `check_findings.py` and `check_coverage.py`; normalization, redaction and quality checks are instruction-led.
+- Rewrote `dynamic-testing.md` as a hypothesis matrix with `CONFIRMED / INCONCLUSIVE / BLOCKED / FALSE_POSITIVE`.
+- Merged severity guidance into `miniapp-audit/references/severity.md` and aligned terminology on `INFO`.
+- Decoupled capture wording from a single vendor; removed `proxy_set` from allowed tools.
+- Removed edition-specific pricing and history claims from the Reqable reference.
+
 ## 2.0.1 - 2026-11-03
 
 ### Fixed

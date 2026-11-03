@@ -138,7 +138,7 @@
 - 可被用户篡改
 - 用于权限判断
 
-标记为 CRITICAL：服务端可能信任客户端角色声明
+标记为候选优先级 CRITICAL；最终严重性在 E2/E3 证据后确定
 
 ### 6. 数据流深度追踪
 
@@ -219,12 +219,12 @@
     {
       "finding_id": "AUTHZ-XXX",
       "type": "horizontal_privilege_escalation/vertical_privilege_escalation/auth_bypass/client_role_trust",
-      "severity": "CRITICAL/HIGH/MEDIUM/LOW",
-      "confidence": "HIGH/MEDIUM/LOW",
+      "severity": "HIGH",
+      "confidence": "MEDIUM",
       "api": "HTTP方法 API路径",
       "vulnerable_param": "漏洞参数名",
       "description": "漏洞描述",
-      "locations": ["代码位置"],
+      "locations": [{"file": "pages/login/login.js", "line": 42}],
       "evidence_refs": ["证据ID"],
       "dataflow": {
         "source": {"file": "源文件", "line": 行号, "type": "来源类型"},
@@ -265,7 +265,7 @@
 
 ## 严重性评级
 
-- **CRITICAL**：客户端角色信任、管理接口无认证
+- **候选 CRITICAL**：客户端角色信任、管理接口无认证
 - **HIGH**：敏感资源水平越权（订单、支付、个人信息）
 - **MEDIUM**：一般资源水平越权、低敏感度垂直越权
 - **LOW**：公开资源的认证缺失

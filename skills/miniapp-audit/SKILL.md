@@ -65,8 +65,6 @@ allowed-tools: Bash Read Write
 | 报告 | 每个发现包含根因、复现、影响、修复、CWE/OWASP 和证据等级 | 退回补充 |
 | 合规 | 未授权目标、他人数据、破坏性写操作 | 立即停止并记录 |
 
-脚本：`python scripts/check_coverage.py --coverage coverage.json` 检查每个资产类型的覆盖状态；`partial` 和 `not_tested` 必须写明原因。
-
 ## 输出契约
 
 一次审计会话包含：

@@ -9,16 +9,28 @@ Supports two layouts:
   - source or developer-tools export: app.json + per-page js/wxml
   - raw wxapkg unpack: app-config.json + app-service.js + per-page html
 
-The script does not execute target code. It reads the configuration and checks
-declared pages, subpackages and plugins against the files on disk.
+The output follows assets/material-check-output.schema.json.
+The script does not execute target code.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
+
+APPID_RE = re.compile(r"wx[0-9a-f]{16}")
+
+
+def infer_app_id(root: Path) -> str | None:
+    for part in [root.name, *[parent.name for parent in root.parents]]:
+        match = APPID_RE.search(part)
+        if match:
+            return match.group(0)
+    return None
 
 
 def load_config(root: Path) -> tuple[dict | None, str | None, str | None]:
@@ -43,37 +55,48 @@ def check_page(root: Path, page: str, raw_mode: bool) -> dict:
         "wxss": base.with_suffix(".wxss").is_file(),
     }
     complete = present["html"] if raw_mode else (present["js"] and present["wxml"])
-    return {
-        "page": page,
-        "present": present,
-        "complete": complete,
-    }
+    return {"page": page, "present": present, "complete": complete}
 
 
-def build_inventory(root: Path) -> dict:
+def build_inventory(root: Path, app_id_override: str | None = None) -> dict:
     config, config_name, error = load_config(root)
+    raw_mode = config_name == "app-config.json"
+    scanned_at = datetime.now(timezone.utc).isoformat()
     result = {
-        "root": str(root.resolve()),
+        "skill": "material-check",
+        "scanned_at": scanned_at,
+        "input_path": str(root.resolve()),
         "material_type": "unknown",
+        "completeness": "BLOCKED",
+        "metadata": {
+            "app_id": "unknown",
+            "pages_count": 0,
+            "subpackages_count": 0,
+            "plugins_count": 0,
+        },
+        "main_package": {"status": "OK", "issues": []},
+        "subpackages": {"declared": [], "found": [], "missing": [], "issues": []},
+        "plugins": {"declared": [], "issues": []},
+        "quality": {
+            "version_consistency": "OK",
+            "decompile_quality": "OK",
+            "issues": [],
+        },
+        "next_actions": [],
+        "coverage_notes": [],
         "config_file": config_name,
-        "app_id": None,
         "app_service": (root / "app-service.js").is_file(),
         "page_frame": (root / "page-frame.js").is_file(),
         "pages": [],
-        "subpackages": [],
-        "plugins": [],
         "permissions": {},
-        "completeness": "blocked",
-        "limitations": [],
     }
     if error:
-        result["limitations"].append(error)
+        result["coverage_notes"].append(error)
+        result["next_actions"].append("provide app.json or app-config.json")
         return result
 
-    raw_mode = config_name == "app-config.json"
-    result["material_type"] = "wxapkg_unpacked" if raw_mode else "source"
-
-    result["app_id"] = config.get("appId") or config.get("appid")
+    result["material_type"] = "decompiled_source"
+    result["app_id"] = app_id_override or config.get("appId") or config.get("appid")
     project_config = root / "project.config.json"
     if project_config.is_file():
         try:
@@ -84,68 +107,129 @@ def build_inventory(root: Path) -> dict:
                 or project_data.get("appId")
             )
         except json.JSONDecodeError:
-            result["limitations"].append("project.config.json is not valid JSON")
+            result["coverage_notes"].append("project.config.json is not valid JSON")
 
-    if raw_mode and not result["app_service"]:
-        result["limitations"].append("app-service.js not found")
+    result["app_id"] = result["app_id"] or infer_app_id(root)
+    result["metadata"]["app_id"] = result["app_id"] or "unknown"
+    if config.get("appName"):
+        result["metadata"]["app_name"] = config["appName"]
 
     pages = config.get("pages") or []
     page_results = [check_page(root, page, raw_mode) for page in pages]
     result["pages"] = page_results
-    missing_pages = [item["page"] for item in page_results if not item["complete"]]
-    if missing_pages:
-        result["limitations"].append(
-            f"{len(missing_pages)} page(s) missing required files"
+    result["metadata"]["pages_count"] = len(page_results)
+
+    main_issues = []
+    for item in page_results:
+        if item["complete"]:
+            continue
+        if raw_mode:
+            main_issues.append(
+                {
+                    "type": "missing_page_js",
+                    "severity": "MEDIUM",
+                    "file": item["page"],
+                    "impact": "page html missing in raw wxapkg layout",
+                }
+            )
+        else:
+            if not item["present"]["js"]:
+                main_issues.append(
+                    {
+                        "type": "missing_page_js",
+                        "severity": "HIGH",
+                        "file": item["page"],
+                        "impact": "page logic is missing",
+                    }
+                )
+            if not item["present"]["wxml"]:
+                main_issues.append(
+                    {
+                        "type": "missing_page_wxml",
+                        "severity": "HIGH",
+                        "file": item["page"],
+                        "impact": "page template is missing",
+                    }
+                )
+    result["main_package"] = {
+        "status": "ISSUES" if main_issues else "OK",
+        "issues": main_issues,
+    }
+    if main_issues:
+        result["coverage_notes"].append(
+            f"{len(main_issues)} page issue(s) detected"
         )
 
+    if raw_mode and not result["app_service"]:
+        result["coverage_notes"].append("app-service.js not found")
+
     subpackages = config.get("subPackages") or config.get("subpackages") or []
+    declared = []
+    found = []
+    missing = []
+    sub_issues = []
     for sub in subpackages:
         sub_root = sub.get("root")
         if not sub_root:
-            result["limitations"].append("subpackage without root")
+            sub_issues.append(
+                {
+                    "type": "missing_subpackage",
+                    "severity": "MEDIUM",
+                    "subpackage": "unknown",
+                    "impact": "subpackage declaration without root",
+                }
+            )
             continue
+        declared.append(sub_root)
         sub_dir = root / sub_root
-        sub_pages = sub.get("pages") or []
-        page_checks = [check_page(sub_dir, page, raw_mode) for page in sub_pages]
-        complete = sub_dir.is_dir() and (
-            not sub_pages or all(item["complete"] for item in page_checks)
+        if sub_dir.is_dir():
+            found.append(sub_root)
+        else:
+            missing.append(sub_root)
+            sub_issues.append(
+                {
+                    "type": "missing_subpackage",
+                    "severity": "HIGH",
+                    "subpackage": sub_root,
+                    "impact": "declared subpackage is not present in the captured material",
+                }
+            )
+    result["subpackages"] = {
+        "declared": declared,
+        "found": found,
+        "missing": missing,
+        "issues": sub_issues,
+    }
+    result["metadata"]["subpackages_count"] = len(declared)
+    if missing:
+        result["coverage_notes"].append(
+            "missing subpackages: " + ", ".join(missing)
         )
-        result["subpackages"].append(
-            {
-                "root": sub_root,
-                "exists": sub_dir.is_dir(),
-                "pages": page_checks,
-                "complete": complete,
-            }
-        )
-        if not sub_dir.is_dir():
-            result["limitations"].append(f"subpackage directory missing: {sub_root}")
 
     plugins = config.get("plugins") or {}
-    for name, meta in plugins.items():
-        result["plugins"].append(
-            {
-                "name": name,
-                "version": meta.get("version"),
-                "provider": meta.get("provider"),
-                "external": True,
-            }
-        )
+    result["plugins"] = {"declared": list(plugins.keys()), "issues": []}
+    result["metadata"]["plugins_count"] = len(plugins)
 
     result["permissions"] = {
-        "permission": config.get("permission") or {},
-        "requiredPrivateInfos": config.get("requiredPrivateInfos") or [],
+        "declared": list((config.get("permission") or {}).keys()),
+        "required_private_infos": config.get("requiredPrivateInfos") or [],
     }
 
-    sub_ok = all(item["complete"] for item in result["subpackages"])
-    pages_ok = not missing_pages
     entry_ok = result["app_service"] if raw_mode else (root / "app.js").is_file()
-    if pages_ok and sub_ok and entry_ok and not error:
-        result["completeness"] = "complete"
-    elif pages_ok or result["subpackages"]:
-        result["completeness"] = "partial"
+    if not entry_ok:
+        result["coverage_notes"].append("entry file not found")
+
+    if main_issues or sub_issues or not entry_ok:
+        result["completeness"] = "PARTIAL"
+        result["next_actions"].extend(
+            [
+                "provide the missing pages or subpackages",
+                "re-run inventory after adding the material",
+            ]
+        )
     else:
-        result["completeness"] = "blocked"
+        result["completeness"] = "COMPLETE"
+        result["next_actions"].append("proceed to threat modeling")
 
     return result
 
@@ -153,11 +237,12 @@ def build_inventory(root: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build a mini program material inventory")
     parser.add_argument("--root", required=True, help="decompiled mini program root")
+    parser.add_argument("--app-id", help="known mini program appid")
     parser.add_argument("--output", help="write JSON to this path instead of stdout")
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="exit non-zero when completeness is not 'complete'",
+        help="exit non-zero when completeness is not 'COMPLETE'",
     )
     args = parser.parse_args()
 
@@ -166,14 +251,14 @@ def main() -> int:
         print(f"error: root is not a directory: {root}", file=sys.stderr)
         return 2
 
-    result = build_inventory(root)
+    result = build_inventory(root, args.app_id)
     payload = json.dumps(result, ensure_ascii=False, indent=2)
     if args.output:
         Path(args.output).write_text(payload + "\n", encoding="utf-8")
     else:
         print(payload)
 
-    if args.strict and result["completeness"] != "complete":
+    if args.strict and result["completeness"] != "COMPLETE":
         print(
             f"error: completeness is {result['completeness']}",
             file=sys.stderr,

@@ -100,7 +100,7 @@ skills-ref validate skills/miniapp-audit
 
 技能以 Agent 权限运行。安装前审阅 `SKILL.md`、`references/` 和 `scripts/`，不要安装来源不明的第三方技能。
 
-本仓库的脚本只使用 Python 标准库，不发起网络请求：`inventory.py` 和 `extract_endpoints.py` 只读取本地文件，`normalize_request.py` 只生成模板，`check_findings.py` 和 `check_coverage.py` 只校验本地 JSON。
+本仓库的脚本只使用 Python 标准库，不发起网络请求：`inventory.py` 和 `extract_endpoints.py` 只读取本地文件；抓包、重放、脱敏和报告质量门由 Agent 按 reference 执行。
 
 ## 使用
 
@@ -132,13 +132,12 @@ skills-ref validate skills/miniapp-audit
 │   ├── miniapp-audit/
 │   │   ├── SKILL.md
 │   │   ├── references/
-│   │   ├── scripts/
 │   │   └── assets/
 │   ├── miniapp-recon/          # SKILL.md, references/, scripts/, assets/
 │   ├── miniapp-threat-model/   # SKILL.md, references/
 │   ├── miniapp-static-audit/   # SKILL.md, references/, scripts/, assets/
-│   ├── miniapp-dynamic/        # SKILL.md, references/, scripts/, assets/
-│   └── miniapp-report/         # SKILL.md, references/, scripts/, assets/
+│   ├── miniapp-dynamic/        # SKILL.md, references/, assets/
+│   └── miniapp-report/         # SKILL.md, references/, assets/
 ├── .github/
 │   └── workflows/
 │       └── validate.yml
@@ -159,6 +158,8 @@ skills-ref validate skills/miniapp-audit
 ```
 
 每个技能以独立目录组织。部分技能会引用套件内的共享方法论，因此建议整套安装；跨阶段的协作通过输入和输出数据完成。
+
+审计脚本只保留两个确定性提取器：`inventory.py` 和 `extract_endpoints.py`。请求归一化、脱敏、严重性判断和覆盖检查由 Agent 按 reference 和质量门执行，不再提供低级辅助脚本。
 
 ## 质量与验证
 

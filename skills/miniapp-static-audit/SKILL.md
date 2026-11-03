@@ -43,7 +43,7 @@ allowed-tools: Bash Read Write
 7. **审查云开发、web-view 和供应链。** 检查云函数鉴权、数据库和存储规则、web-view 域名白名单、`postMessage` 处理、插件权限和依赖风险。
 8. **排序假设。** 按影响、可达性和证据成本排序，为每个假设写测试思路。
 
-脚本：`python scripts/extract_endpoints.py --root <dir> --output surface.json` 做第一轮发现。动态 URL、复杂封装和间接调用需要 AST 或人工复核。
+脚本：`python scripts/extract_endpoints.py --root <dir> --app-id <appid> --output surface.json` 做第一轮发现。动态 URL、复杂封装和间接调用需要 AST 或人工复核。
 
 ## 领域问题
 

@@ -31,13 +31,28 @@ allowed-tools: Bash Read Write
 
 1. **加载证据。** 材料清单、威胁模型、静态假设、动态证据和覆盖记录。
 2. **归一化与去重。** 同一根因和同一受影响控制的发现合并；影响或修复不同的发现分开。
-3. **校验契约。** 用 `assets/` 下的 schema 检查发现和证据；运行 `python scripts/check_findings.py --findings findings.json` 检查必填字段、枚举和证据等级。
+3. **校验契约。** 用 `assets/` 下的 schema 检查发现和证据；逐项核对必填字段、枚举和证据等级。
 4. **分配证据等级。** E0/E1 进入待确认或观察项；E2/E3 进入已确认。
-5. **分配严重性和置信度。** 使用 `references/severity.md`，并给出理由。
+5. **分配严重性和置信度。** 使用 `../miniapp-audit/references/severity.md`，并给出理由。
 6. **编写每个发现。** 通过下面的发现质量门。
 7. **编写覆盖与限制。** 标记已测、部分和未测，说明原因。
 8. **编写执行摘要。** 总体风险、已确认问题、关键依赖和修复顺序。
 9. **定义复测标准。** 写明修复后必须失败的请求或行为。
+
+## 领域输入映射
+
+各领域输出是候选假设，不是最终 finding。归一化时映射到统一字段：
+
+| 输入 | 主要内容 | 映射要点 |
+|---|---|---|
+| `authz-findings.json` | `findings[]` | 对象/角色标识、缺失校验映射到 `asset`、`root_cause`、`reproduction` |
+| `payment-findings.json` | `findings[]` 或 `vulnerabilities[]` | 价格、订单状态、回调校验映射到 `asset`、`impact`、`remediation` |
+| `dataflow-output.json` | `findings[]` | `source`、`sink`、`guards` 映射到 `asset`、`root_cause`、`reproduction` |
+| `secret-scan-output.json` | `secrets[]` | 规则、文件、行号映射到 `locations`；密钥值脱敏 |
+| `dynamic-test-results.json` | `confirmed_vulnerabilities[]`、`all_tests[]` | 只有复现结果映射为 `verified`；保留请求、响应和证据等级 |
+| `privacy-compliance-output.json` | `sections[]`、`findings[]` | 合规项映射到 `category: compliance`；严重性只作候选 |
+
+字段缺失时保留在待确认部分，不猜测。
 
 ## 发现质量门
 
@@ -79,7 +94,7 @@ allowed-tools: Bash Read Write
 
 - `references/report-builder.md` — 详细报告生成指引。
 - `references/evidence-standard.md` — 证据等级、脱敏和保留。
-- `references/severity.md` — 严重性、置信度和影响。
+- `../miniapp-audit/references/severity.md` — 严重性、置信度和影响。
 - `assets/report-template.md` — 报告模板。
 - `assets/finding.schema.json` — 发现契约。
 - `assets/evidence.schema.json` — 证据契约。

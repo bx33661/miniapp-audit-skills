@@ -2,15 +2,17 @@
 
 Severity and confidence answer different questions. Severity describes potential impact; confidence describes how strongly the evidence supports the finding. Do not use confidence to inflate severity, or severity to imply evidence.
 
+Domain references may assign a candidate priority. The final severity is assigned in the report stage, after E2/E3 evidence.
+
 ## Severity levels
 
 | Level | Meaning | Mini program examples |
 |---|---|---|
-| Critical | Broad compromise of money, identity or sensitive data with low preconditions | Unauthenticated administrative API; payment amount accepted from client; cloud credential with broad bucket access |
-| High | Significant data, money or privilege impact under realistic preconditions | Horizontal access to orders or personal data; plaintext AppSecret in client; refund or order state controlled by client |
-| Medium | Limited data or function impact, or a meaningful step in a chain | Enumeration of public identifiers; verbose errors; missing rate limit on sensitive queries |
-| Low | Minor information exposure or defense-in-depth gap | Internal path disclosure; non-sensitive configuration leakage; missing security header |
-| Informational | Observation without demonstrated security impact | Code-quality issue; deprecated dependency without a reachable exploit |
+| CRITICAL | Broad compromise of money, identity or sensitive data with low preconditions | Unauthenticated administrative API; payment amount accepted from client; cloud credential with broad bucket access |
+| HIGH | Significant data, money or privilege impact under realistic preconditions | Horizontal access to orders or personal data; plaintext AppSecret in client; refund or order state controlled by client |
+| MEDIUM | Limited data or function impact, or a meaningful step in a chain | Enumeration of public identifiers; verbose errors; missing rate limit on sensitive queries |
+| LOW | Minor information exposure or defense-in-depth gap | Internal path disclosure; non-sensitive configuration leakage; missing security header |
+| INFO | Observation without demonstrated security impact | Code-quality issue; deprecated dependency without a reachable exploit |
 
 ## Impact dimensions
 

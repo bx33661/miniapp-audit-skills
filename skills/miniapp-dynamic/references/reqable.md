@@ -26,17 +26,16 @@ The Agent remains the actuator: it reads captured requests and performs replay a
 - iOS does not expose application attribution; filter by host and User-Agent. Android can filter by application.
 - If a mini program refuses to work under the VPN, use a hotspot gateway with mitmproxy or a device-level proxy.
 
-## MCP read surface
+## Capture read surface
 
-The free MCP surface is sufficient for capture and reading:
+The capture and read surface used by this workflow covers:
 
 - `capture_live_set_enabled` — start or stop capture.
 - `capture_live_filter` — filter by application, host, method, status, URL or keyword.
 - `capture_live_get_by_id` — read the full request and response.
 - `capture_live_generate_curl` — export a request for replay.
-- `proxy_set` — control the desktop system proxy.
 
-Rewrite, breakpoint and script creation through MCP require a paid plan. Do not depend on them; mutation belongs in the Agent HTTP client.
+Rewrite, breakpoint and script features are optional. This workflow does not depend on them; mutation belongs in the Agent HTTP client.
 
 ## Request template
 
@@ -57,18 +56,13 @@ Remove hop-by-hop headers that the HTTP client recalculates: `Host`, `Content-Le
 - If a request fails, compare it with the original before concluding that the endpoint is secure.
 - If the signature covers the field under test, static analysis or a hook is required; do not brute-force.
 
-## Free and paid features
+## Edition notes
 
-| Capability | Free | Required for this workflow |
-|---|---|---|
-| Capture, decrypt, filter, detail, curl export | Yes | Yes |
-| MCP read tools | Yes | Yes |
-| Rewrite, breakpoint, script | Limited in GUI; MCP creation is paid | No |
-| History | 30 days | Export important evidence |
-| Remote devices | One | Sufficient for a single test device |
+Capture, request detail and curl export are the only capabilities this workflow requires. Rewrite, breakpoint, script and multi-device features are optional; verify the installed edition's limits before relying on them.
 
 ## Safety
 
+- The user enables and disables the system proxy; the Agent does not change it.
 - Capture only authorized targets.
 - Stop capture and disable the system proxy after testing.
 - Redact tokens and personal data from notes.
