@@ -129,6 +129,12 @@ Trigger queries are stored in `evals/trigger-queries.csv`. Add output evals unde
 
 ## Version history
 
+### 2.0.1
+
+- `inventory.py` supports raw wxapkg unpack layout.
+- `extract_endpoints.py` keeps distinct dynamic URL expressions.
+- Both fixes verified against a real mini program package.
+
 ### 2.0
 
 - Reorganized into six phase-oriented skills.

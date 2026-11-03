@@ -5,7 +5,11 @@ Usage:
   python inventory.py --root /path/to/miniapp
   python inventory.py --root /path/to/miniapp --output inventory.json --strict
 
-The script does not execute target code. It reads app.json and checks the
+Supports two layouts:
+  - source or developer-tools export: app.json + per-page js/wxml
+  - raw wxapkg unpack: app-config.json + app-service.js + per-page html
+
+The script does not execute target code. It reads the configuration and checks
 declared pages, subpackages and plugins against the files on disk.
 """
 
@@ -17,37 +21,44 @@ import sys
 from pathlib import Path
 
 
-def load_app_json(root: Path) -> tuple[dict | None, str | None]:
-    path = root / "app.json"
-    if not path.is_file():
-        return None, "app.json not found"
-    try:
-        return json.loads(path.read_text(encoding="utf-8")), None
-    except json.JSONDecodeError as exc:
-        return None, f"app.json is not valid JSON: {exc}"
+def load_config(root: Path) -> tuple[dict | None, str | None, str | None]:
+    for name in ("app.json", "app-config.json"):
+        path = root / name
+        if not path.is_file():
+            continue
+        try:
+            return json.loads(path.read_text(encoding="utf-8")), name, None
+        except json.JSONDecodeError as exc:
+            return None, name, f"{name} is not valid JSON: {exc}"
+    return None, None, "app.json or app-config.json not found"
 
 
-def check_page(root: Path, page: str) -> dict:
+def check_page(root: Path, page: str, raw_mode: bool) -> dict:
     base = root / page
     present = {
         "js": base.with_suffix(".js").is_file(),
         "wxml": base.with_suffix(".wxml").is_file(),
+        "html": base.with_suffix(".html").is_file(),
         "json": base.with_suffix(".json").is_file(),
         "wxss": base.with_suffix(".wxss").is_file(),
     }
+    complete = present["html"] if raw_mode else (present["js"] and present["wxml"])
     return {
         "page": page,
         "present": present,
-        "complete": present["js"] and present["wxml"],
+        "complete": complete,
     }
 
 
 def build_inventory(root: Path) -> dict:
-    app, error = load_app_json(root)
+    config, config_name, error = load_config(root)
     result = {
         "root": str(root.resolve()),
-        "app_json": app is not None,
+        "material_type": "unknown",
+        "config_file": config_name,
         "app_id": None,
+        "app_service": (root / "app-service.js").is_file(),
+        "page_frame": (root / "page-frame.js").is_file(),
         "pages": [],
         "subpackages": [],
         "plugins": [],
@@ -59,7 +70,10 @@ def build_inventory(root: Path) -> dict:
         result["limitations"].append(error)
         return result
 
-    result["app_id"] = app.get("appId") or app.get("appid")
+    raw_mode = config_name == "app-config.json"
+    result["material_type"] = "wxapkg_unpacked" if raw_mode else "source"
+
+    result["app_id"] = config.get("appId") or config.get("appid")
     project_config = root / "project.config.json"
     if project_config.is_file():
         try:
@@ -71,37 +85,43 @@ def build_inventory(root: Path) -> dict:
             )
         except json.JSONDecodeError:
             result["limitations"].append("project.config.json is not valid JSON")
-    pages = app.get("pages") or []
-    page_results = [check_page(root, page) for page in pages]
+
+    if raw_mode and not result["app_service"]:
+        result["limitations"].append("app-service.js not found")
+
+    pages = config.get("pages") or []
+    page_results = [check_page(root, page, raw_mode) for page in pages]
     result["pages"] = page_results
     missing_pages = [item["page"] for item in page_results if not item["complete"]]
     if missing_pages:
         result["limitations"].append(
-            f"{len(missing_pages)} page(s) missing js or wxml"
+            f"{len(missing_pages)} page(s) missing required files"
         )
 
-    subpackages = app.get("subPackages") or app.get("subpackages") or []
+    subpackages = config.get("subPackages") or config.get("subpackages") or []
     for sub in subpackages:
         sub_root = sub.get("root")
-        sub_pages = sub.get("pages") or []
         if not sub_root:
             result["limitations"].append("subpackage without root")
             continue
         sub_dir = root / sub_root
-        page_checks = [check_page(sub_dir, page) for page in sub_pages]
+        sub_pages = sub.get("pages") or []
+        page_checks = [check_page(sub_dir, page, raw_mode) for page in sub_pages]
+        complete = sub_dir.is_dir() and (
+            not sub_pages or all(item["complete"] for item in page_checks)
+        )
         result["subpackages"].append(
             {
                 "root": sub_root,
                 "exists": sub_dir.is_dir(),
                 "pages": page_checks,
-                "complete": sub_dir.is_dir()
-                and all(item["complete"] for item in page_checks),
+                "complete": complete,
             }
         )
         if not sub_dir.is_dir():
             result["limitations"].append(f"subpackage directory missing: {sub_root}")
 
-    plugins = app.get("plugins") or {}
+    plugins = config.get("plugins") or {}
     for name, meta in plugins.items():
         result["plugins"].append(
             {
@@ -113,13 +133,14 @@ def build_inventory(root: Path) -> dict:
         )
 
     result["permissions"] = {
-        "permission": app.get("permission") or {},
-        "requiredPrivateInfos": app.get("requiredPrivateInfos") or [],
+        "permission": config.get("permission") or {},
+        "requiredPrivateInfos": config.get("requiredPrivateInfos") or [],
     }
 
     sub_ok = all(item["complete"] for item in result["subpackages"])
     pages_ok = not missing_pages
-    if pages_ok and sub_ok and not error:
+    entry_ok = result["app_service"] if raw_mode else (root / "app.js").is_file()
+    if pages_ok and sub_ok and entry_ok and not error:
         result["completeness"] = "complete"
     elif pages_ok or result["subpackages"]:
         result["completeness"] = "partial"

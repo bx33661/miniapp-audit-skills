@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 - 2026-11-03
+
+### Fixed
+
+- `inventory.py` now supports raw wxapkg unpack layout (`app-config.json`, `app-service.js`, page `.html`) in addition to source layout.
+- `extract_endpoints.py` no longer collapses distinct dynamic URL expressions into a single record.
+- Verified both fixes against a real mini program package and the local fixture.
+
 ## 2.0.0 - 2026-11-03
 
 ### Changed

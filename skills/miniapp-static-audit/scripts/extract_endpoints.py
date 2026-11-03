@@ -171,10 +171,10 @@ def main() -> int:
 
     payload = {
         "root": str(root.resolve()),
-        "apis": dedupe(apis, ("url", "method")),
-        "cloud_functions": dedupe(cloud, ("name",)),
-        "navigation": dedupe(navigation, ("url",)),
-        "webviews": dedupe(webviews, ("src",)),
+        "apis": dedupe(apis, ("call", "url", "url_expression", "method")),
+        "cloud_functions": dedupe(cloud, ("name", "name_expression")),
+        "navigation": dedupe(navigation, ("url", "url_expression")),
+        "webviews": dedupe(webviews, ("src", "src_expression")),
         "limitations": [
             "Line-based discovery; dynamic URL expressions require manual review.",
             "Use an AST pass for precise extraction and data-flow analysis.",
