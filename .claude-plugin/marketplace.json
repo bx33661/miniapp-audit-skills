@@ -1,0 +1,26 @@
+{
+  "name": "miniapp-audit-skills",
+  "owner": {
+    "name": "WxRay"
+  },
+  "metadata": {
+    "description": "WeChat mini program security audit skills for agents",
+    "version": "2.0.0"
+  },
+  "plugins": [
+    {
+      "name": "miniapp-audit",
+      "description": "Six-phase WeChat mini program security audit workflow: orchestration, reconnaissance, threat modeling, static audit, dynamic verification and reporting",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/miniapp-audit",
+        "./skills/miniapp-recon",
+        "./skills/miniapp-threat-model",
+        "./skills/miniapp-static-audit",
+        "./skills/miniapp-dynamic",
+        "./skills/miniapp-report"
+      ]
+    }
+  ]
+}

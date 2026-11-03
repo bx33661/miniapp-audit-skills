@@ -4,9 +4,6 @@
 *.swo
 *~
 
-# Ignore documentation
-docs/
-
 # Ignore test outputs
 test-outputs/
 *.test.json
@@ -30,6 +27,10 @@ wxray-audit-*/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Ignore Python cache
+__pycache__/
+*.pyc
 
 # Ignore OS files
 Thumbs.db

@@ -1,0 +1,28 @@
+{
+  "sources": [
+    {"name": "page options", "patterns": ["options.", "query.", "e.currentTarget.dataset"]},
+    {"name": "storage", "patterns": ["wx.getStorage", "wx.getStorageSync"]},
+    {"name": "network response", "patterns": ["res.data", "response.data"]},
+    {"name": "user input", "patterns": ["bindinput", "bindtap", "form"]},
+    {"name": "clipboard", "patterns": ["wx.getClipboardData"]},
+    {"name": "QR scene", "patterns": ["scene", "query.scene"]}
+  ],
+  "sinks": [
+    {"name": "wx.request", "patterns": ["wx.request", "request("]},
+    {"name": "cloud call", "patterns": ["wx.cloud.callFunction", "cloud.database"]},
+    {"name": "web-view", "patterns": ["web-view", "src="]},
+    {"name": "file", "patterns": ["wx.openDocument", "wx.saveFile", "fs."]},
+    {"name": "render", "patterns": ["innerHTML", "rich-text", "WXS"]},
+    {"name": "navigation", "patterns": ["wx.navigateTo", "wx.redirectTo"]}
+  ],
+  "guards": [
+    {"name": "server authorization", "patterns": ["openid", "getWXContext", "session", "role"]},
+    {"name": "allowlist", "patterns": ["allowlist", "whitelist", "includes("]},
+    {"name": "encoding", "patterns": ["encodeURIComponent", "escape", "sanitize"]},
+    {"name": "parameterization", "patterns": ["prepare", "parameterized", "bind"]}
+  ],
+  "transforms": [
+    {"name": "decode", "patterns": ["decodeURIComponent", "atob", "JSON.parse"]},
+    {"name": "string concat", "patterns": ["+", "${"]}
+  ]
+}
