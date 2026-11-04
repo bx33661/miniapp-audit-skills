@@ -1,69 +1,24 @@
-# Reqable Capture Layer
+# Reqable 抓包层
 
-Reqable is the capture sensor for dynamic verification. It decrypts HTTPS traffic, exposes request and response details, and can forward mobile traffic to the desktop client.
+需要建立或排查抓包链路时阅读。Reqable 用于读取原始流量；重放与改参可以使用 Agent 的 HTTP 客户端，无需 rewrite、breakpoint 或 script。
 
-The Agent remains the actuator: it reads captured requests and performs replay and mutation in its own HTTP client. Reqable rewrite, breakpoint and script features are optional and not required for this workflow.
+## 环境确认
 
-## Desktop setup
+在用户已授权的环境中确认监听地址、客户端代理和 CA 信任，先用已知 HTTPS 请求验证链路。不要假定端口、已装证书或某个进程必定走系统代理。系统代理与信任配置的变更需要相应授权，测试结束后恢复本次改动。
 
-- Start Reqable and enable its proxy on `127.0.0.1:9000`.
-- Enable the system proxy when testing desktop clients, or configure the target client to use the proxy explicitly.
-- Install and trust the Reqable CA certificate in every client that will be inspected.
-- Confirm capture works with a known HTTPS request before testing the target.
+macOS 小程序容器可能显示为“微信”或 WeChatAppEx；bundle ID 可作为过滤线索，但以实际进程和记录为准。主微信与小程序容器的代理路径可能不同。未看到请求时先排查过滤与转发，不直接判目标没有发请求。
 
-## macOS WeChat
+手机协同模式、网关代理及设备代理按已安装版本配置。若无法按应用归属过滤，按授权 host、路径与 User-Agent 缩小范围。证书错误或 pinning 是抓包阻塞，需要记录，不自行扩大绕过范围。
 
-- The mini program container application is named `微信` with bundle identifier `com.tencent.flue.WeChatAppEx`.
-- Filtering by `WeChat` may miss records; use the Chinese application name or the bundle identifier.
-- The mini program container may use the system proxy even when the main WeChat process uses a TUN interface. Verify with a short capture before adding Proxifier.
-- If the container bypasses the proxy, use Proxifier to force `WeChatAppEx` traffic to the Reqable port, or move to a gateway capture.
+## 读取能力
 
-## Mobile WeChat
+| 工具 | 用途 |
+|---|---|
+| capture_live_set_enabled | 在已授权范围内切换抓包 |
+| capture_live_filter | 先过滤授权目标记录 |
+| capture_live_get_by_id | 读取选定记录的完整请求响应 |
+| capture_live_generate_curl | 导出供重放参考的请求 |
 
-- Desktop QR code, mobile Reqable collaboration mode, scan and connect.
-- Install and trust the CA certificate on the device.
-- Enable debugging and allow the VPN service.
-- iOS does not expose application attribution; filter by host and User-Agent. Android can filter by application.
-- If a mini program refuses to work under the VPN, use a hotspot gateway with mitmproxy or a device-level proxy.
+只读取本次目标所需记录，不导出整个历史。记录实际 host、账号角色、抓取时间、请求编号和易变字段，避免混用旧会话。导出的 curl 含凭证时不直接贴入共享日志。
 
-## Capture read surface
-
-The capture and read surface used by this workflow covers:
-
-- `capture_live_set_enabled` — start or stop capture.
-- `capture_live_filter` — filter by application, host, method, status, URL or keyword.
-- `capture_live_get_by_id` — read the full request and response.
-- `capture_live_generate_curl` — export a request for replay.
-
-Rewrite, breakpoint and script features are optional. This workflow does not depend on them; mutation belongs in the Agent HTTP client.
-
-## Request template
-
-When reading a record, retain:
-
-- Method, URL and path.
-- Headers that identify the mini program: `User-Agent`, `Referer`, `xweb_xhr`, content type.
-- Body, preserving form field order where relevant.
-- Cookies and session tokens, stored separately from the template.
-- Volatile fields: `sign`, `timestamp`, `nonce`, one-time tokens.
-
-Remove hop-by-hop headers that the HTTP client recalculates: `Host`, `Content-Length`, `Connection`, `Accept-Encoding`.
-
-## Replay constraints
-
-- Prefer a request generated during the current session.
-- Replaying an old request may fail due to timestamp, nonce, session or signature binding.
-- If a request fails, compare it with the original before concluding that the endpoint is secure.
-- If the signature covers the field under test, static analysis or a hook is required; do not brute-force.
-
-## Edition notes
-
-Capture, request detail and curl export are the only capabilities this workflow requires. Rewrite, breakpoint, script and multi-device features are optional; verify the installed edition's limits before relying on them.
-
-## Safety
-
-- The user enables and disables the system proxy; the Agent does not change it.
-- Capture only authorized targets.
-- Stop capture and disable the system proxy after testing.
-- Redact tokens and personal data from notes.
-- Clear captured history when it contains sensitive data.
+安装版本支持哪些能力以现场核实为准，不依赖免费或付费版本的固定假设。重放规则见 `replay.md`，数据处理见 `safety.md`。

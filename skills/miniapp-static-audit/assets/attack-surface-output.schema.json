@@ -1,14 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wxray.dev/schemas/attack-surface-output.schema.json",
   "title": "Attack Surface Output",
   "description": "攻击面映射输出格式",
   "type": "object",
-  "required": ["skill", "scanned_at", "source_dir", "metadata", "apis", "statistics"],
+  "required": ["skill", "scanned_at", "source_dir", "metadata", "apis", "statistics", "limitations"],
   "properties": {
     "skill": {
       "type": "string",
-      "const": "attack-surface"
+      "const": "miniapp-static-audit"
     },
     "scanned_at": {
       "type": "string",
@@ -21,8 +20,8 @@
       "type": "object",
       "properties": {
         "app_id": {
-          "type": "string",
-          "description": "AppID（脱敏）"
+          "type": ["string", "null"],
+          "description": "已提供或识别的 AppID；未识别为 null，不代表已验证来源"
         },
         "app_name": {
           "type": "string"
@@ -35,13 +34,13 @@
           "type": "string"
         },
         "pages_count": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "subpackages_count": {
-          "type": "integer"
+          "type": ["integer", "null"]
         },
         "plugins_count": {
-          "type": "integer"
+          "type": ["integer", "null"]
         }
       }
     },
@@ -57,6 +56,8 @@
       "items": {
         "type": "object",
         "properties": {
+          "dynamic": {"type": "boolean"},
+          "name_expression": {"type": ["string", "null"]},
           "id": {
             "type": "string",
             "pattern": "^CF-[0-9]{3,}$"
@@ -189,7 +190,7 @@
             }
           },
           "is_third_party": {
-            "type": "boolean"
+            "type": ["boolean", "null"]
           }
         }
       }
@@ -229,6 +230,35 @@
           "wrapped_api": {
             "type": "string",
             "enum": ["wx.request", "uni.request", "Taro.request", "axios", "fetch"]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "未执行、未解析或未核实的检查；缺失字段不能解释为零发现"
+    },
+    "navigation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["url", "dynamic", "locations"],
+        "properties": {
+          "url": {"type": ["string", "null"]},
+          "url_expression": {"type": ["string", "null"]},
+          "dynamic": {"type": "boolean"},
+          "locations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["file", "line"],
+              "properties": {
+                "file": {"type": "string", "minLength": 1},
+                "line": {"type": "integer", "minimum": 1}
+              }
+            }
           }
         }
       }

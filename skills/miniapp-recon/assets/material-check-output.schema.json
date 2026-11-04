@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Material Check Output Schema",
-  "description": "审计材料完整性检查结果",
+  "title": "Material inventory",
+  "description": "COMPLETE仅表示已检查的声明结构齐备，不证明版本一致、业务完整或安全。",
   "type": "object",
   "required": [
     "skill",
@@ -9,229 +9,259 @@
     "input_path",
     "material_type",
     "completeness",
-    "metadata"
+    "metadata",
+    "main_package",
+    "subpackages",
+    "plugins",
+    "quality",
+    "coverage_notes"
   ],
   "properties": {
     "skill": {
-      "type": "string",
-      "const": "material-check"
+      "const": "miniapp-recon"
     },
     "scanned_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "检查时间戳"
+      "format": "date-time"
     },
     "input_path": {
       "type": "string",
-      "description": "输入路径（wxapkg 文件或源码目录）"
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "material_type": {
-      "type": "string",
-      "enum": ["wxapkg", "wechat_cache", "decompiled_source", "unknown"],
-      "description": "材料类型"
+      "enum": [
+        "wxapkg",
+        "wechat_cache",
+        "decompiled_source",
+        "unknown"
+      ]
     },
     "completeness": {
-      "type": "string",
-      "enum": ["COMPLETE", "PARTIAL", "CONFLICTED", "BLOCKED"],
-      "description": "完整性状态"
+      "enum": [
+        "COMPLETE",
+        "PARTIAL",
+        "CONFLICTED",
+        "BLOCKED"
+      ]
     },
     "metadata": {
       "type": "object",
-      "required": ["app_id", "pages_count"],
+      "required": [
+        "app_id",
+        "pages_count"
+      ],
       "properties": {
         "app_id": {
-          "type": "string",
-          "description": "小程序 AppID"
+          "type": ["string", "null"],
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "app_name": {
-          "type": "string",
-          "description": "小程序名称"
+          "type": "string"
         },
         "pages_count": {
-          "type": "integer",
-          "description": "页面总数"
+          "type": ["integer", "null"],
+          "minimum": 0
         },
         "subpackages_count": {
-          "type": "integer",
-          "description": "分包数量"
+          "type": ["integer", "null"],
+          "minimum": 0
         },
         "plugins_count": {
-          "type": "integer",
-          "description": "插件数量"
+          "type": ["integer", "null"],
+          "minimum": 0
         }
       }
     },
     "main_package": {
       "type": "object",
+      "required": [
+        "status",
+        "issues"
+      ],
       "properties": {
         "status": {
-          "type": "string",
-          "enum": ["OK", "ISSUES"]
+          "enum": [
+            "OK",
+            "ISSUES",
+            "UNKNOWN"
+          ]
         },
         "issues": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["type", "severity", "file", "impact"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "missing_entry",
-                  "missing_page_wxml",
-                  "missing_page_js",
-                  "missing_page_wxss",
-                  "corrupted_file"
-                ]
-              },
-              "severity": {
-                "type": "string",
-                "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-              },
-              "file": {
-                "type": "string",
-                "description": "缺失或损坏的文件"
-              },
-              "impact": {
-                "type": "string",
-                "description": "影响说明"
-              }
-            }
+            "$ref": "#/definitions/issue"
           }
         }
       }
     },
     "subpackages": {
       "type": "object",
+      "required": [
+        "declared",
+        "found",
+        "missing",
+        "issues"
+      ],
       "properties": {
         "declared": {
           "type": "array",
-          "items": {"type": "string"},
-          "description": "app.json 中声明的分包"
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
         },
         "found": {
           "type": "array",
-          "items": {"type": "string"},
-          "description": "实际找到的分包"
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
         },
         "missing": {
           "type": "array",
-          "items": {"type": "string"},
-          "description": "缺失的分包"
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
         },
         "issues": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["type", "severity", "subpackage", "impact"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": ["missing_subpackage", "missing_subpackage_page"]
-              },
-              "severity": {
-                "type": "string",
-                "enum": ["HIGH", "MEDIUM", "LOW"]
-              },
-              "subpackage": {
-                "type": "string"
-              },
-              "file": {
-                "type": "string"
-              },
-              "impact": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/definitions/issue"
           }
         }
       }
     },
     "plugins": {
       "type": "object",
+      "required": [
+        "declared",
+        "issues"
+      ],
       "properties": {
         "declared": {
           "type": "array",
-          "items": {"type": "string"},
-          "description": "声明的插件"
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
         },
         "issues": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["type", "severity", "plugin", "impact"],
-            "properties": {
-              "type": {
-                "type": "string",
-                "const": "missing_plugin"
-              },
-              "severity": {
-                "type": "string",
-                "enum": ["MEDIUM", "LOW"]
-              },
-              "plugin": {
-                "type": "string"
-              },
-              "provider": {
-                "type": "string"
-              },
-              "impact": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/definitions/issue"
           }
         }
       }
     },
     "quality": {
       "type": "object",
+      "required": [
+        "version_consistency",
+        "decompile_quality",
+        "issues"
+      ],
       "properties": {
         "version_consistency": {
-          "type": "string",
-          "enum": ["OK", "ISSUES"]
+          "enum": [
+            "OK",
+            "ISSUES",
+            "UNKNOWN"
+          ]
         },
         "decompile_quality": {
-          "type": "string",
-          "enum": ["OK", "ISSUES"]
+          "enum": [
+            "OK",
+            "ISSUES",
+            "UNKNOWN"
+          ]
         },
         "issues": {
           "type": "array",
           "items": {
-            "type": "object",
-            "required": ["type", "severity", "impact"],
-            "properties": {
-              "type": {
+            "anyOf": [
+              {
                 "type": "string",
-                "enum": [
-                  "potential_version_mix",
-                  "corrupted_files",
-                  "unknown_sections"
-                ]
+                "minLength": 1,
+                "pattern": "\\S"
               },
-              "severity": {
-                "type": "string",
-                "enum": ["HIGH", "MEDIUM", "LOW"]
-              },
-              "count": {
-                "type": "integer"
-              },
-              "impact": {
-                "type": "string"
+              {
+                "$ref": "#/definitions/issue"
               }
-            }
+            ]
           }
         }
       }
     },
-    "next_actions": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "建议的下一步操作"
-    },
     "coverage_notes": {
       "type": "array",
-      "items": {"type": "string"},
-      "description": "覆盖范围说明"
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
+    }
+  },
+  "definitions": {
+    "issue": {
+      "type": "object",
+      "required": [
+        "type",
+        "impact"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "subpackage": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "plugin": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      },
+      "additionalProperties": true,
+      "not": {
+        "required": [
+          "severity"
+        ]
+      }
     }
   }
 }

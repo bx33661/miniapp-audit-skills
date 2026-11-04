@@ -1,147 +1,47 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Payment Audit Findings Schema",
-  "description": "支付安全审计结果",
+  "title": "payment review results",
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "skill",
     "scanned_at",
     "source_dir",
-    "summary",
-    "findings"
+    "findings",
+    "limitations"
   ],
   "properties": {
     "skill": {
-      "type": "string",
-      "const": "payment-audit"
+      "const": "miniapp-static-audit"
     },
     "scanned_at": {
       "type": "string",
       "format": "date-time"
     },
     "source_dir": {
-      "type": "string"
-    },
-    "summary": {
-      "type": "object",
-      "required": ["payment_flows_found", "vulnerabilities_found"],
-      "properties": {
-        "payment_flows_found": {
-          "type": "integer",
-          "description": "发现的支付流程数量"
-        },
-        "vulnerabilities_found": {
-          "type": "integer",
-          "description": "发现的漏洞数量"
-        },
-        "critical": {
-          "type": "integer"
-        },
-        "high": {
-          "type": "integer"
-        },
-        "medium": {
-          "type": "integer"
-        },
-        "low": {
-          "type": "integer"
-        }
-      }
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "findings": {
       "type": "array",
       "items": {
-        "type": "object",
-        "required": [
-          "finding_id",
-          "vulnerability_type",
-          "severity",
-          "title",
-          "description"
-        ],
-        "properties": {
-          "finding_id": {
-            "type": "string",
-            "pattern": "^PAY-\\d+$"
-          },
-          "vulnerability_type": {
-            "type": "string",
-            "enum": [
-              "price_tampering",
-              "order_state_bypass",
-              "callback_verification",
-              "replay_attack",
-              "logic_flaw"
-            ]
-          },
-          "severity": {
-            "type": "string",
-            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
-          },
-          "status": {
-            "type": "string",
-            "enum": ["tool_candidate", "inferred", "server_confirmation_needed", "dynamically_confirmed"],
-            "description": "证据等级"
-          },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "file": {
-            "type": "string"
-          },
-          "line": {
-            "type": "integer"
-          },
-          "code_snippet": {
-            "type": "string"
-          },
-          "impact": {
-            "type": "string",
-            "description": "影响说明"
-          },
-          "remediation": {
-            "type": "string",
-            "description": "修复建议"
-          },
-          "evidence": {
-            "type": "object",
-            "properties": {
-              "client_sends_price": {
-                "type": "boolean"
-              },
-              "server_validation_missing": {
-                "type": "boolean"
-              },
-              "callback_handler_present": {
-                "type": "boolean"
-              },
-              "callback_verification_weak": {
-                "type": "boolean"
-              }
-            }
-          },
-          "test_case": {
-            "type": "object",
-            "properties": {
-              "scenario": {
-                "type": "string"
-              },
-              "steps": {
-                "type": "array",
-                "items": {"type": "string"}
-              },
-              "expected_behavior": {
-                "type": "string"
-              },
-              "actual_risk": {
-                "type": "string"
-              }
-            }
-          }
-        }
+        "$ref": "../../miniapp-report/assets/finding.schema.json"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object"
       }
     }
   }

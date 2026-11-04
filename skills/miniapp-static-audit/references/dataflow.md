@@ -1,436 +1,47 @@
-> Detailed checklist. Adapt it to the target; this is not a rigid sequence.
+# 数据来源、路径与实际约束
 
-# Dataflow Tracer - 数据流追踪
+产物为 `evidence/dataflow-analysis.json`，遵循 [dataflow-output.schema.json](../assets/dataflow-output.schema.json)，`skill` 为 `miniapp-static-audit`。此处指导 Agent 核实具体路径，不声称存在自动污点分析器。[dataflow-rules.json](../assets/dataflow-rules.json) 只提供搜索线索。
 
-## 功能
+必需顶层为 `skill`、`traced_at`、`source_dir`、`findings`、`limitations`；不输出旧 `summary` 或 `risk_assessment`。按统一 finding schema 的状态条件填写必需字段，不能用评分补齐缺失证据。
 
-启发式追踪敏感数据从 Source 到 Sink 的流动路径，识别防护措施，评估注入风险。
+## 从安全问题选择路径
 
-**数据流模型**：
-```
-Source → [Transform₁] → [Transform₂] → ... → [Guard?] → Sink
-```
+先说清需要验证的边界：谁能控制哪个值，该值到达哪个操作，那里应执行什么安全决策。优先跟进已有领域疑点，而非将所有 Source/Sink 组合机械转换成漏洞。
 
-**风险判断**：
-- Safe: Source → Guard (有效) → Sink
-- Risky: Source → Guard (弱) → Sink
-- Vulnerable: Source → (无 Guard) → Sink
+- 来源可包括页面 `options`/scene、表单或组件事件、本地存储、剪贴板、网络响应、云函数事件参数。是否可控及可控范围须结合实际赋值、身份和运行环境确认。
+- 汇点是具体安全相关操作，不由函数名决定。网络请求、云调用、文件操作、WebView、导航、渲染或日志都需先确定真实执行主体与副作用。
+- 区分小程序客户端、云函数、普通后端与 WebView；客户端可控 URL 发往自己的服务器不自动构成 SSRF，`rich-text` 也不等同浏览器任意 HTML 执行。
 
-**规则配置**: 模式定义位于 `../assets/dataflow-rules.json`
-- `sources` - 数据入口点模式
-- `sinks` - 危险操作点模式
-- `transforms` - 数据变换模式
-- `guards` - 防护措施模式
+## 建立可引用的路径
 
-## 执行流程
+逐段核对定义/赋值、对象字段、参数与返回值、封装、回调、异步时序、模块边界和可达分支，记录原始文件/模块、行列或字节范围与相关代码。
 
-### 步骤 1: 参数解析
+- 同名变量可能属于不同作用域；文字相同不证明同一数据对象。属性复制、别名、解构和覆盖都可能改变路径。
+- 相邻行、固定向后窗口、±5 行命中或字符串包含，不证明 source 到 sink 可达；不要按这种规则补出路径。
+- `encodeURIComponent`、JSON 序列化、解码、数字解析和字符串替换是变换，必须记录输出如何被后续解析或覆盖，不能自动判为安全/不安全。
+- 动态分派、缺失模块、配置、云规则或服务端实现造成的断点明确写入 `dataflow.uncertainty`；不要虚构连接边、调用目标或验证结果。
 
-解析输入参数：
-- `source_dir`: 源码目录（必需）
-- `output_dir`: 输出目录（必需）
-- `trace_depth`: 追踪深度（可选，默认 10）
+## 核实安全决策和实际约束
 
-如果缺少必需参数，报错并终止。
+对路径上的每个 guard，回答：它检查的是否为最终使用值，依据是否可信，是否覆盖全部到达分支，失败时是否真的阻止敏感操作，后续变换能否绕开约束。
 
-### 步骤 2: 加载规则文件
+| 操作上下文 | 应核实的实际约束 |
+|---|---|
+| 身份、订单、租户 | 服务端可信身份绑定、资源归属、角色策略；客户端条件不能替代服务端判断 |
+| 数据库/命令 | 实际执行位置、参数化边界、操作符或命令参数是否可控；仅看到 prepare/bind 字样不够 |
+| URL/WebView/下载 | 规范化后的协议、host、端口、路径、重定向及实际请求主体；检查的是原始字符串还是最终目标 |
+| 文件读写 | 实际根目录与路径规范化、跨目录/符号链接边界、可访问范围及文件敏感性 |
+| 渲染/消息 | 宿主执行语义、编码上下文、组件限制、消息来源验证与消息触发的敏感操作 |
+| 日志与数据传输 | 真正包含的数据、接收者、可访问主体、是否到达该分支及存储/传输保护 |
 
-从 `../assets/dataflow-rules.json` 加载 Source、Sink、Guard 和 Transform 模式。
-- `sources` - 数据入口点模式
-- `sinks` - 危险操作点模式
-- `transforms` - 数据变换模式
-- `guards` - 防护措施模式
+`role`、`getWXContext`、`session`、`includes`、`sanitize`、`escape` 等词出现不证明保护有效。允许列表必须约束最终语义对象；类型/长度检查不自动提供鉴权；客户端域名检查不替代服务端出站约束。
 
-解析为 JSON 对象供后续使用。
+## 输出和证据
 
-### 步骤 3: 查找所有 JS 文件
-
-查找源码目录下所有 JavaScript 文件：
-- 扩展名：`.js`
-- 排除：`node_modules` 目录
-- 使用：`find` 命令递归搜索
-
-### 步骤 4: 识别所有 Source（数据入口点）
-
-遍历每个 JS 文件：
-1. 读取文件内容，按行分割
-2. 对每个 source pattern：
-   - 编译正则表达式
-   - 在每行中匹配
-   - 提取变量名（捕获组）
-3. 记录每个匹配：
-   - `source_id`: 唯一标识（SRC-1, SRC-2...）
-   - `type`: 来源类型（query_param, form_input, storage_read...）
-   - `variable`: 变量名
-   - `file`: 相对文件路径
-   - `line`: 行号
-   - `code`: 代码片段
-   - `risk_level`: 风险等级（HIGH/MEDIUM/LOW）
-   - `description`: 描述
-
-输出：识别的 Source 数量。
-
-### 步骤 5: 识别所有 Sink（危险操作点）
-
-遍历每个 JS 文件：
-1. 读取文件内容，按行分割
-2. 对每个 sink pattern 的每个正则表达式：
-   - 编译正则（忽略大小写）
-   - 在每行中测试匹配
-3. 记录每个匹配：
-   - `sink_id`: 唯一标识（SINK-1, SINK-2...）
-   - `type`: 危险操作类型（sql_query, command_exec...）
-   - `file`: 相对文件路径
-   - `line`: 行号
-   - `code`: 代码片段
-   - `severity`: 严重程度（CRITICAL/HIGH/MEDIUM/LOW）
-   - `vulnerability`: 漏洞类型（SQL Injection, XSS...）
-
-输出：识别的 Sink 数量。
-
-### 步骤 6: 数据流追踪（核心算法）
-
-对每个 Source 执行追踪：
-1. 初始化队列，放入 Source 作为起点
-2. 广度优先搜索（BFS）：
-   - 取出当前节点
-   - 检查深度是否超过 `trace_depth`，超过则跳过
-   - 检查是否已访问（使用 `file:line:variable` 去重）
-   - 检查附近是否有 Sink（±5 行范围内且代码包含变量）
-   - 如果到达 Sink，记录完整数据流
-   - 否则，查找变量的后续使用（赋值、验证、函数调用）
-   - 将后续使用加入队列，继承当前的 transforms 和 guards
-3. 返回所有追踪到的数据流
-
-**数据流结构**：
-- `source`: 起点信息
-- `sink`: 终点信息
-- `path`: 完整路径节点列表
-- `transforms`: 数据变换列表
-- `guards`: 防护措施列表
-- `depth`: 追踪深度
-
-输出：追踪的数据流数量。
-
-### 步骤 7: 风险评估
-
-对每条数据流计算风险分数：
-1. **基础分**：根据 Sink 严重程度
-   - CRITICAL: 10 分
-   - HIGH: 7 分
-   - MEDIUM: 4 分
-   - LOW: 2 分
-2. **防护调整**：
-   - 无 Guard: +5 分
-   - 有弱 Guard（无 HIGH 有效性）: +3 分
-   - 有强 Guard（有 HIGH 有效性）: -3 分
-3. **变换惩罚**：每个不安全变换 +1 分
-4. **等级判定**：
-   - ≥12 分: CRITICAL
-   - ≥8 分: HIGH
-   - ≥4 分: MEDIUM
-   - <4 分: LOW
-
-### 步骤 8: 生成发现列表
-
-将每条数据流转换为标准发现格式：
-- `finding_id`: DF-1, DF-2...
-- `title`: "{漏洞类型}: {变量} → {Sink类型}"
-- `vulnerability`: 漏洞名称
-- `severity`: 风险等级
-- `confidence`: 置信度（有 Guard 则 MEDIUM，否则 HIGH）
-- `source`: Source 详情
-- `sink`: Sink 详情
-- `dataflow`: 数据流详情（source/sink 位置、transforms、guards、sanitizers）
-- `description`: 中文描述
-- `impact`: 影响说明
-- `evidence_code`: 证据代码
-- `locations`: 位置列表（source + sink）
-- `remediation`: 修复建议列表
-- `cwe`: CWE 编号
-
-过滤掉 INFO 级别的发现。
-
-### 步骤 9: 生成输出文件
-
-组装最终输出：
-- `skill`: "dataflow-tracer"
-- `traced_at`: 时间戳
-- `source_dir`: 源码目录
-- `summary`: 统计信息
-  - `sources_found`: Source 数量
-  - `sinks_found`: Sink 数量
-  - `flows_traced`: 数据流数量
-  - `vulnerable_flows`: 高危数据流数量
-- `findings`: 发现列表
-- `sources_catalog`: Source 完整目录
-- `sinks_catalog`: Sink 完整目录
-
-保存为 JSON 格式到 `{output_dir}/evidence/dataflow-analysis.json`。
-
-输出完成信息和统计数据。
-
-## 辅助函数职责
-
-### traceDataflow
-追踪单个 Source 到所有可达 Sink 的路径，使用 BFS 算法。
-
-### findVariableUses
-在文件中查找变量的后续使用（赋值、验证、函数调用），限制向后搜索 50 行。
-
-### detectTransform
-检测代码行是否包含数据变换操作，返回变换类型和安全性。
-
-### detectGuard
-检测代码行是否包含防护措施，返回防护类型和有效性。
-
-### assessRisk
-根据 Sink 严重性、Guard 有效性、不安全变换计算风险分数和等级。
-
-### generateRemediation
-根据漏洞类型生成具体的修复建议列表。
-
-### getCWE
-根据漏洞名称返回对应的 CWE 编号。
-
-```js
-// 参考片段：完整实现应放入 scripts/trace_dataflow.js
-    }
-  }
-}
-
-console.log(` 识别 ${sinks.length} 个危险点`)
-
-// 5. 数据流追踪（核心）
-const allFlows = []
-for (const source of sources) {
-  const flows = await traceDataflow(source, sinks, jsFiles, sourceDir, traceDepth, transformPatterns, guardPatterns)
-  allFlows.push(...flows)
-}
-
-console.log(` 追踪 ${allFlows.length} 条数据流`)
-
-// 6. 风险评估和生成发现
-const findings = allFlows.map((flow, idx) => {
-  const risk = assessRisk(flow)
-
-  return {
-    finding_id: `DF-${idx + 1}`,
-    title: `${flow.sink.vulnerability}: ${flow.source.variable} → ${flow.sink.type}`,
-    vulnerability: flow.sink.vulnerability,
-    severity: risk.status,
-    confidence: flow.guards.length > 0 ? 'MEDIUM' : 'HIGH',
-    source: {type: flow.source.type, variable: flow.source.variable, file: flow.source.file, line: flow.source.line},
-    sink: {type: flow.sink.type, file: flow.sink.file, line: flow.sink.line},
-    dataflow: {
-      source: {location: `${flow.source.file}:${flow.source.line}`, type: flow.source.type, variable: flow.source.variable},
-      sink: {location: `${flow.sink.file}:${flow.sink.line}`, type: flow.sink.type},
-      transforms: flow.transforms,
-      guards: flow.guards,
-      sanitizers: flow.guards.filter(g => g.effectiveness === 'HIGH').map(g => g.type)
-    },
-    description: `检测到数据从 ${flow.source.description} 流向 ${flow.sink.vulnerability} 点，${flow.guards.length > 0 ? `途经 ${flow.guards.length} 个防护措施` : '无防护措施'}`,
-    impact: risk.vulnerable ? `可被利用进行 ${flow.sink.vulnerability} 攻击` : '存在风险但有部分防护',
-    evidence_code: flow.source.code,
-    locations: [{file: flow.source.file, line: flow.source.line, type: 'source'}, {file: flow.sink.file, line: flow.sink.line, type: 'sink'}],
-    remediation: generateRemediation(flow),
-    cwe: getCWE(flow.sink.vulnerability)
-  }
-})
-
-// 7. 输出结果
-const output = {
-  skill: 'dataflow-tracer',
-  traced_at: new Date().toISOString(),
-  source_dir: sourceDir,
-  summary: {
-    sources_found: sources.length,
-    sinks_found: sinks.length,
-    flows_traced: allFlows.length,
-    vulnerable_flows: findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length
-  },
-  findings: findings.filter(f => f.severity !== 'INFO'),
-  sources_catalog: sources,
-  sinks_catalog: sinks
-}
-
-await Write({
-  file_path: `${outputDir}/evidence/dataflow-analysis.json`,
-  content: JSON.stringify(output, null, 2)
-})
-
-console.log(` 数据流分析完成: ${findings.length} 个发现，${findings.filter(f => f.severity === 'CRITICAL' || f.severity === 'HIGH').length} 个高危`)
-
-// ========== 辅助函数 ==========
-
-async function traceDataflow(source, sinks, jsFiles, sourceDir, maxDepth, transformPatterns, guardPatterns) {
-  const flows = []
-  const queue = [{variable: source.variable, file: source.file, line: source.line, path: [source], transforms: [], guards: [], depth: 0}]
-  const visited = new Set()
-
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (current.depth > maxDepth) continue
-
-    const visitKey = `${current.file}:${current.line}:${current.variable}`
-    if (visited.has(visitKey)) continue
-    visited.add(visitKey)
-
-    // 检查是否到达 Sink
-    const nearSinks = sinks.filter(s => s.file === current.file && Math.abs(s.line - current.line) <= 5 && s.code.includes(current.variable))
-    for (const sink of nearSinks) {
-      flows.push({source: source, sink: sink, path: current.path, transforms: current.transforms, guards: current.guards, depth: current.depth})
-    }
-
-    // 追踪变量后续使用
-    const nextUses = await findVariableUses(current.variable, current.file, current.line, sourceDir, transformPatterns, guardPatterns)
-    for (const use of nextUses) {
-      queue.push({
-        variable: use.variable, file: use.file, line: use.line,
-        path: [...current.path, use], transforms: [...current.transforms, ...use.transforms],
-        guards: [...current.guards, ...use.guards], depth: current.depth + 1
-      })
-    }
-  }
-
-  return flows
-}
-
-async function findVariableUses(variable, file, startLine, sourceDir, transformPatterns, guardPatterns) {
-  const fullPath = `${sourceDir}/${file}`
-  const content = await Read({file_path: fullPath})
-  const lines = content.split('\n')
-  const uses = []
-
-  for (let i = startLine; i < Math.min(lines.length, startLine + 50); i++) {
-    const line = lines[i]
-    if (line.trim().startsWith('//') || !line.includes(variable)) continue
-
-    // 检查赋值
-    const assignMatch = line.match(new RegExp(`(\\w+)\\s*=\\s*.*${variable}`))
-    if (assignMatch) {
-      const newVar = assignMatch[1]
-      const transform = detectTransform(line, transformPatterns)
-      uses.push({type: 'assignment', variable: newVar, file: file, line: i + 1, code: line.trim(), transforms: transform ? [transform] : [], guards: []})
-    }
-
-    // 检查防护
-    const guard = detectGuard(line, variable, guardPatterns)
-    if (guard) {
-      uses.push({type: 'guard', variable: variable, file: file, line: i + 1, code: line.trim(), transforms: [], guards: [guard]})
-    }
-  }
-
-  return uses
-}
-
-function detectTransform(code, patterns) {
-  for (const t of patterns) {
-    if (new RegExp(t.pattern).test(code)) {
-      return {type: t.type, safe: t.safe, code: code.trim()}
-    }
-  }
-  return null
-}
-
-function detectGuard(code, variable, patterns) {
-  for (const g of patterns) {
-    const pattern = g.pattern.replace('{VAR}', variable)
-    if (new RegExp(pattern).test(code)) {
-      return {type: g.type, effectiveness: g.effectiveness, code: code.trim()}
-    }
-  }
-  return null
-}
-
-function assessRisk(flow) {
-  let riskScore = 0
-  const severityScores = {CRITICAL: 10, HIGH: 7, MEDIUM: 4, LOW: 2}
-  riskScore += severityScores[flow.sink.severity] || 0
-
-  if (flow.guards.length === 0) {
-    riskScore += 5
-  } else {
-    const effectiveGuards = flow.guards.filter(g => g.effectiveness === 'HIGH')
-    riskScore += effectiveGuards.length === 0 ? 3 : -3
-  }
-
-  riskScore += flow.transforms.filter(t => !t.safe).length
-
-  let status = 'LOW'
-  if (riskScore >= 12) status = 'CRITICAL'
-  else if (riskScore >= 8) status = 'HIGH'
-  else if (riskScore >= 4) status = 'MEDIUM'
-
-  return {status: status, score: riskScore, vulnerable: riskScore >= 8}
-}
-
-function generateRemediation(flow) {
-  const remediations = []
-
-  switch (flow.sink.vulnerability) {
-    case 'SQL Injection':
-      remediations.push('使用参数化查询或 ORM')
-      remediations.push('对用户输入进行严格验证（类型、长度、格式）')
-      remediations.push('使用白名单过滤特殊字符')
-      break
-    case 'NoSQL Injection':
-      remediations.push('验证用户输入类型（避免对象注入）')
-      remediations.push('使用严格的 Schema 验证')
-      break
-    case 'Command Injection':
-      remediations.push('避免使用 exec/eval 等危险函数')
-      remediations.push('使用白名单验证命令参数')
-      break
-    case 'XSS':
-      remediations.push('对输出进行 HTML 转义')
-      remediations.push('使用框架提供的安全渲染方法')
-      break
-    case 'Path Traversal':
-      remediations.push('规范化路径并验证在允许目录内')
-      remediations.push('使用白名单限制可访问文件')
-      break
-    case 'SSRF':
-      remediations.push('使用 URL 白名单验证')
-      remediations.push('禁止访问内网地址')
-      break
-    default:
-      remediations.push('添加输入验证和输出编码')
-  }
-
-  return remediations
-}
-
-function getCWE(vulnerability) {
-  const cweMap = {
-    'SQL Injection': 'CWE-89',
-    'NoSQL Injection': 'CWE-943',
-    'Command Injection': 'CWE-78',
-    'XSS': 'CWE-79',
-    'Path Traversal': 'CWE-22',
-    'SSRF': 'CWE-918',
-    'Information Disclosure': 'CWE-200'
-  }
-  return cweMap[vulnerability] || 'N/A'
-}
-```
-
-## 能力与限制
-
-**能力**:
-- 自动识别常见 Source 和 Sink
-- 启发式数据流追踪（深度可配置）
-- Transform 和 Guard 识别
-- 多种漏洞类型支持（SQL/NoSQL/XSS/命令注入/路径遍历/SSRF）
-
-**限制**（诚实声明）:
-- **不保证 100% 路径覆盖**：复杂控制流、闭包、异步可能遗漏
-- **不支持跨文件深度追踪**：仅追踪当前文件内数据流
-- **启发式算法**：基于模式匹配，非完整符号执行
-- **需人工复核**：Guard 有效性需结合业务逻辑判断
-
-**算法说明**: 采用工作列表式数据流追踪；复杂控制流、跨文件和异步路径需要人工复核。
-
-## 输出文件
-
-- `evidence/dataflow-analysis.json` - 数据流分析结果
+- `findings[]` 使用统一 [finding.schema.json](../../miniapp-report/assets/finding.schema.json)，编号稳定为 `F-001`。数据路径放在 `finding.dataflow.source/sink/path/transforms/guards`；已观察的节点与未解决部分分开说明。
+- 可选 `sources_catalog`、`sinks_catalog` 只记录实际识别对象及位置，不附基于函数名的严重性，也不把目录命中数当漏洞数。
+- 不计算 riskScore，不按“没有 guard 加分/出现强 guard 减分”判断，不输出无依据的 `safe`、`effectiveness` 或 `vulnerable` 布尔结论。
+- 显式填写 `status`：有待核实的路径为 `needs_validation`，被可靠反证排除为 `rejected`，有直接边界失效证据才为 `confirmed`；候选可有 `priority`，仅 confirmed 有 `severity`。
+- E0 为线索；E1 为有根据的待验证路径；E2 为可复现或可独立核验的直接证据证明具体边界失效；E3 为授权测试数据上进一步证实影响范围。证据强度不等同静态/动态方式。
+- 确认需 E2/E3、非空 `evidence_refs`、根因、复现、影响、修复、预期与实际、复测。静态实现可以直接证明失效，但必须具备足够上下文和可达依据。
+- 未核实约束交接为最小授权实验，说明前置条件、单一改变量和判定证据；不伪造测试结果。E2 足够后停止扩大影响，候选不进入最终风险计数。

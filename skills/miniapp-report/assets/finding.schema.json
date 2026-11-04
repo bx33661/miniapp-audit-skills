@@ -1,185 +1,358 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wxray.dev/schemas/finding.schema.json",
   "title": "Finding",
-  "description": "安全发现记录",
+  "description": "findings.json 数组中的单条记录；状态必须明确，不自动补全。",
   "type": "object",
-  "required": ["finding_id", "severity", "title", "category", "locations"],
+  "required": [
+    "finding_id",
+    "status",
+    "title",
+    "category",
+    "evidence_level"
+  ],
   "properties": {
     "finding_id": {
       "type": "string",
-      "pattern": "^F-[0-9]{3,}$",
-      "description": "发现唯一ID，格式：F-001"
-    },
-    "rule_id": {
-      "type": "string",
-      "description": "对应的规则ID",
-      "examples": ["SEC-001", "PRIV-002", "BIZ-003"]
-    },
-    "severity": {
-      "type": "string",
-      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"],
-      "description": "严重程度"
-    },
-    "confidence": {
-      "type": "string",
-      "enum": ["HIGH", "MEDIUM", "LOW"],
-      "default": "MEDIUM",
-      "description": "置信度"
-    },
-    "evidence_level": {
-      "type": "string",
-      "enum": ["E0", "E1", "E2", "E3"],
-      "description": "证据等级；E0/E1 为假设，E2/E3 为已确认"
+      "pattern": "^F-[0-9]{3,}$"
     },
     "status": {
-      "type": "string",
-      "enum": ["verified", "confirmed", "server_confirmation_needed", "tool_candidate", "false_positive"],
-      "default": "verified",
-      "description": "发现状态"
+      "enum": [
+        "confirmed",
+        "needs_validation",
+        "rejected"
+      ]
     },
     "title": {
       "type": "string",
-      "maxLength": 100,
-      "description": "发现标题"
-    },
-    "description": {
-      "type": "string",
-      "description": "详细描述"
+      "minLength": 1,
+      "pattern": "\\S",
+      "maxLength": 100
     },
     "category": {
-      "type": "string",
-      "enum": ["security", "privacy", "business_logic", "compliance", "dependency", "quality"],
-      "description": "问题分类"
+      "enum": [
+        "security",
+        "privacy",
+        "business_logic",
+        "compliance",
+        "dependency"
+      ]
     },
-    "cwe": {
+    "evidence_level": {
+      "enum": [
+        "E0",
+        "E1",
+        "E2",
+        "E3"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "INFO"
+      ]
+    },
+    "severity_reason": {
       "type": "string",
-      "pattern": "^CWE-[0-9]+$",
-      "description": "CWE编号",
-      "examples": ["CWE-798", "CWE-89"]
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "基于已证明影响、范围与前提的评级理由"
+    },
+    "priority": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "pattern": "^EV-[0-9]{3,}$"
+      }
     },
     "locations": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["file", "line"],
         "properties": {
           "file": {
             "type": "string",
-            "description": "文件路径"
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "line": {
             "type": "integer",
-            "minimum": 1,
-            "description": "行号"
+            "minimum": 1
           },
           "column": {
             "type": "integer",
-            "minimum": 1,
-            "description": "列号（可选）"
+            "minimum": 1
+          },
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
           }
-        }
-      },
-      "description": "问题位置列表"
+        },
+        "anyOf": [
+          {
+            "required": [
+              "file"
+            ]
+          },
+          {
+            "required": [
+              "asset"
+            ]
+          }
+        ]
+      }
     },
-    "evidence_refs": {
+    "remediation": {
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "string",
-        "pattern": "^EV-[0-9]{3,}$"
-      },
-      "description": "关联的证据ID列表"
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "preconditions": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "retest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "具体复测步骤与通过判据；未执行时明确说明，不能伪造通过。"
+    },
+    "verification": {
+      "type": "object",
+      "required": [
+        "method",
+        "test_case"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "static_analysis",
+            "dynamic_test",
+            "manual_review"
+          ]
+        },
+        "test_case": {
+          "type": "object",
+          "required": [
+            "expected",
+            "actual"
+          ],
+          "properties": {
+            "request": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "expected": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "actual": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          }
+        }
+      }
     },
     "dataflow": {
       "type": "object",
-      "description": "数据流信息",
+      "description": "保留实际 source/sink/path/transforms/guards、各节点定位与结论不确定性；字段按证据填写，不生成虚构完整路径。",
       "properties": {
         "source": {
           "type": "object",
           "properties": {
-            "file": {"type": "string"},
-            "line": {"type": "integer"},
-            "type": {"type": "string", "examples": ["user_input", "url_param", "storage"]}
+            "file": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "line": {"type": "integer", "minimum": 1},
+            "asset": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "type": {"type": "string", "minLength": 1, "pattern": "\\S"}
           }
         },
         "transforms": {
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "file": {"type": "string"},
-              "line": {"type": "integer"},
-              "operation": {"type": "string", "examples": ["concat", "encode", "encrypt"]}
-            }
+            "type": "object"
           }
         },
         "guards": {
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "file": {"type": "string"},
-              "line": {"type": "integer"},
-              "type": {"type": "string", "examples": ["validation", "sanitization", "escape"]}
-            }
+            "type": "object"
           }
         },
         "sink": {
           "type": "object",
           "properties": {
-            "file": {"type": "string"},
-            "line": {"type": "integer"},
-            "type": {"type": "string", "examples": ["sql_query", "command", "log", "http_request"]}
+            "file": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "line": {"type": "integer", "minimum": 1},
+            "asset": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "type": {"type": "string", "minLength": 1, "pattern": "\\S"}
           }
-        }
-      }
-    },
-    "asset": {
-      "type": "string",
-      "description": "受影响资产：端点、云函数、页面或存储路径"
-    },
-    "root_cause": {
-      "type": "string",
-      "description": "失效的信任边界和缺失的服务端控制"
-    },
-    "reproduction": {
-      "type": "string",
-      "description": "可复现步骤，密钥和个人信息已脱敏"
-    },
-    "impact": {
-      "type": "string",
-      "description": "影响描述"
-    },
-    "remediation": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "修复建议列表"
-    },
-    "verification": {
-      "type": "object",
-      "description": "验证信息",
-      "properties": {
-        "method": {
-          "type": "string",
-          "enum": ["static_analysis", "dynamic_test", "manual_review"],
-          "description": "验证方法"
         },
-        "test_case": {
-          "type": "object",
-          "description": "测试用例（动态测试时）",
-          "properties": {
-            "request": {"type": "string"},
-            "expected": {"type": "string"},
-            "actual": {"type": "string"}
-          }
-        }
+        "path": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
+        "uncertainty": {"type": "string", "minLength": 1, "pattern": "\\S"}
       }
     },
     "references": {
       "type": "array",
-      "items": {"type": "string"},
-      "description": "参考资料链接"
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "cwe": {
+      "type": "string",
+      "pattern": "^CWE-[0-9]+$"
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "asset": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "root_cause": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "reproduction": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "impact": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "validation_needed": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "rejection_reason": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "confirmed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "severity",
+          "severity_reason",
+          "asset",
+          "evidence_refs",
+          "root_cause",
+          "reproduction",
+          "impact",
+          "remediation",
+          "preconditions",
+          "verification",
+          "retest"
+        ],
+        "properties": {
+          "evidence_level": {
+            "enum": [
+              "E2",
+              "E3"
+            ]
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "severity"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "needs_validation"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "validation_needed"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "rejected"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "rejection_reason"
+        ]
+      }
+    }
+  ]
 }

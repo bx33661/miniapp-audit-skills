@@ -1,97 +1,194 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wxray.dev/schemas/audit-session.schema.json",
-  "title": "Audit Session",
-  "description": "审计会话元数据",
+  "title": "Audit session and coverage",
   "type": "object",
-  "required": ["session_id", "created_at", "mode", "input_path"],
+  "additionalProperties": false,
+  "required": [
+    "session_id",
+    "created_at",
+    "mode",
+    "scope",
+    "coverage",
+    "limitations"
+  ],
   "properties": {
     "session_id": {
       "type": "string",
-      "description": "审计会话唯一ID"
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "created_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "创建时间"
-    },
-    "updated_at": {
-      "type": "string",
-      "format": "date-time",
-      "description": "更新时间"
+      "format": "date-time"
     },
     "mode": {
-      "type": "string",
-      "enum": ["quick", "standard", "deep", "custom"],
-      "description": "审计模式"
+      "enum": [
+        "focused",
+        "full"
+      ]
     },
     "input_path": {
       "type": "string",
-      "description": "输入路径（wxapkg/缓存目录/源码）"
+      "minLength": 1,
+      "pattern": "\\S"
     },
-    "focus": {
-      "type": "array",
-      "items": {"type": "string"},
-      "description": "用户关注点"
-    },
-    "output_dir": {
-      "type": "string",
-      "description": "输出目录"
-    },
-    "material": {
+    "scope": {
       "type": "object",
-      "description": "材料信息",
+      "additionalProperties": false,
+      "required": [
+        "in_scope",
+        "out_of_scope",
+        "environment",
+        "authorization"
+      ],
       "properties": {
-        "type": {
-          "type": "string",
-          "enum": ["wxapkg", "wechat_cache", "decompiled_source"],
-          "description": "材料类型"
+        "in_scope": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
         },
-        "completeness": {
-          "type": "string",
-          "enum": ["COMPLETE", "PARTIAL", "CONFLICTED", "BLOCKED"],
-          "description": "完整性状态"
+        "out_of_scope": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
         },
-        "app_id": {"type": "string"},
-        "app_name": {"type": "string"},
-        "version": {"type": "string"}
+        "environment": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "authorization": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        },
+        "data_handling": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
       }
     },
-    "skills_executed": {
+    "coverage": {
       "type": "array",
       "items": {
         "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset",
+          "test_type",
+          "identity",
+          "status",
+          "evidence_refs"
+        ],
         "properties": {
-          "skill": {"type": "string"},
-          "started_at": {"type": "string", "format": "date-time"},
-          "completed_at": {"type": "string", "format": "date-time"},
-          "status": {
+          "asset": {
             "type": "string",
-            "enum": ["success", "partial", "failed"]
+            "minLength": 1,
+            "pattern": "\\S"
           },
-          "output_file": {"type": "string"}
-        }
-      },
-      "description": "已执行的 Skills"
-    },
-    "statistics": {
-      "type": "object",
-      "description": "统计信息",
-      "properties": {
-        "total_findings": {"type": "integer"},
-        "by_severity": {
-          "type": "object",
-          "properties": {
-            "CRITICAL": {"type": "integer"},
-            "HIGH": {"type": "integer"},
-            "MEDIUM": {"type": "integer"},
-            "LOW": {"type": "integer"},
-            "INFO": {"type": "integer"}
+          "test_type": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "status": {
+            "enum": [
+              "tested",
+              "partial",
+              "not_tested"
+            ]
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^EV-[0-9]{3,}$"
+            },
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "residual_risk": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
           }
         },
-        "apis_discovered": {"type": "integer"},
-        "files_scanned": {"type": "integer"}
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "tested",
+                    "partial"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "partial",
+                    "not_tested"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reason",
+                "residual_risk"
+              ]
+            }
+          }
+        ]
       }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
     }
   }
 }

@@ -1,0 +1,180 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "environment",
+    "results",
+    "limitations"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "run_status": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked"
+      ]
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "account",
+          "outcome",
+          "response_status",
+          "checks_passed",
+          "evidence_refs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "account": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "outcome": {
+            "enum": [
+              "response",
+              "transport_error",
+              "not_attempted"
+            ]
+          },
+          "response_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 100,
+            "maximum": 599
+          },
+          "checks_passed": {
+            "type": "boolean"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^EV-[0-9]{3,}$"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "error_code": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "const": "response"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "response_status": {
+                  "type": "integer"
+                },
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            },
+            "else": {
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "checks_passed": {
+                  "const": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "const": "not_attempted"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "response_status": {
+                  "type": "null"
+                },
+                "evidence_refs": {
+                  "maxItems": 0
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "outcome": {
+                  "const": "transport_error"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "checks_passed": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reason"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Observed HTTP replay receipts"
+}

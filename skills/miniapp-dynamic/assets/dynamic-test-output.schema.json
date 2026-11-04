@@ -1,20 +1,21 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Dynamic Test Output Schema",
-  "description": "动态漏洞测试结果",
+  "title": "Dynamic verification results",
+  "description": "实验结果与最终发现状态分开；严重性由报告阶段根据确认影响评定。",
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "skill",
     "tested_at",
     "environment",
-    "test_mode",
-    "summary",
-    "findings"
+    "findings",
+    "limitations",
+    "entry_mode",
+    "requests"
   ],
   "properties": {
     "skill": {
-      "type": "string",
-      "const": "dynamic-tester"
+      "const": "miniapp-dynamic"
     },
     "tested_at": {
       "type": "string",
@@ -22,80 +23,306 @@
     },
     "environment": {
       "type": "string",
-      "description": "测试环境 base_url"
-    },
-    "test_mode": {
-      "type": "string",
-      "enum": ["safe", "aggressive"],
-      "description": "测试模式"
-    },
-    "summary": {
-      "type": "object",
-      "required": ["total_tests", "vulnerable_confirmed", "false_positives", "blocked"],
-      "properties": {
-        "total_tests": {
-          "type": "integer",
-          "description": "总测试数"
-        },
-        "vulnerable_confirmed": {
-          "type": "integer",
-          "description": "确认存在漏洞的数量"
-        },
-        "false_positives": {
-          "type": "integer",
-          "description": "误报数量"
-        },
-        "blocked": {
-          "type": "integer",
-          "description": "被阻止的测试数量"
-        }
-      }
+      "minLength": 1,
+      "pattern": "\\S"
     },
     "findings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["finding_id", "test_type", "status", "severity"],
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "test_type",
+          "asset",
+          "identity",
+          "status",
+          "expected",
+          "actual",
+          "evidence_refs"
+        ],
         "properties": {
           "finding_id": {
             "type": "string",
-            "description": "关联的静态分析 finding_id"
+            "pattern": "^F-[0-9]{3,}$"
           },
           "test_type": {
             "type": "string",
-            "enum": [
-              "horizontal_privilege_escalation",
-              "vertical_privilege_escalation",
-              "sql_injection",
-              "nosql_injection",
-              "payment_price_tampering",
-              "session_management"
-            ]
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "asset": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
           },
           "status": {
-            "type": "string",
-            "enum": ["CONFIRMED", "FALSE_POSITIVE", "BLOCKED", "SKIPPED"],
-            "description": "测试结果状态"
+            "enum": [
+              "CONFIRMED",
+              "INCONCLUSIVE",
+              "BLOCKED",
+              "FALSE_POSITIVE"
+            ]
           },
-          "severity": {
-            "type": "string",
-            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
-          },
-          "evidence": {
+          "baseline": {
             "type": "object",
-            "description": "验证证据"
+            "required": [
+              "request",
+              "response"
+            ],
+            "properties": {
+              "request": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "response": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "additionalProperties": false
+          },
+          "mutation": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "actual": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^EV-[0-9]{3,}$"
+            },
+            "uniqueItems": true
+          },
+          "evidence_level": {
+            "enum": [
+              "E0",
+              "E1",
+              "E2",
+              "E3"
+            ]
           },
           "reproduction": {
             "type": "array",
-            "items": {"type": "string"},
-            "description": "复现步骤"
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "CONFIRMED",
+                    "FALSE_POSITIVE"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "baseline",
+                "mutation",
+                "reproduction"
+              ],
+              "properties": {
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CONFIRMED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "evidence_level"
+              ],
+              "properties": {
+                "evidence_level": {
+                  "enum": [
+                    "E2",
+                    "E3"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "INCONCLUSIVE",
+                    "BLOCKED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "reason"
+              ]
+            }
+          }
+        ]
       }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
     },
     "audit_log_path": {
       "type": "string",
-      "description": "审计日志文件路径"
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "entry_mode": {
+      "enum": [
+        "traffic",
+        "hypothesis"
+      ]
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_ref",
+          "action",
+          "identity",
+          "method",
+          "url",
+          "evidence_refs",
+          "replay"
+        ],
+        "properties": {
+          "source_ref": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "method": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^EV-[0-9]{3,}$"
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          },
+          "replay": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "evidence_refs"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_attempted",
+                  "succeeded",
+                  "blocked"
+                ]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^EV-[0-9]{3,}$"
+                },
+                "uniqueItems": true
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            },
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "succeeded"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            },
+            "else": {
+              "required": [
+                "reason"
+              ]
+            }
+          }
+        }
+      },
+      "description": "实际捕获/导入的请求和实际重放状态；导出curl不算已发送。"
     }
   }
 }

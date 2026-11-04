@@ -1,341 +1,57 @@
-> Detailed checklist. Adapt it to the target; this is not a rigid sequence.
+# 隐私行为与适用规则核实
 
-# Privacy Compliance - 隐私合规检查
+产物为 `evidence/privacy-compliance.json`，遵循 [privacy-compliance-output.schema.json](../assets/privacy-compliance-output.schema.json)，`skill` 为 `miniapp-static-audit`。目标是核实数据处理事实、授权边界与适用要求，不能凭配置缺失下法律结论。
 
-检查小程序隐私合规性，覆盖《个人信息保护法》(PIPL) 和微信小程序隐私规范。
+## 先核实适用范围
 
-## 法规参考
+- 记录目标发布版本、基础库/客户端、平台规则适用时间和实际功能。开发包、体验版、发布版或旧接口的行为可能不同；材料不足时保留未核实项。
+- 规则依据需要具体页面、版本/日期及适用条件。微信隐私保护指引可从 [平台文档](https://developers.weixin.qq.com/miniprogram/dev/framework/user-privacy/) 核实；法律要求应核对现行正式文本及处理场景，不沿用笼统的“微信2023规范”。
+- `regulations` 只列实际用于判断且已核对适用性的规则；技术发现、平台要求与法律适用判断分别说明，不因技术关键词自动宣告违法。
+- 平台后台配置、服务协议、隐私保护指引、服务端实现和线上交互可能不随源码交付。配置文件或源码搜索没有命中，不能证明线上没有说明或相应能力。
 
-详细条款见：
-- PIPL 完整条款：https://www.npc.gov.cn/npc/c30834/202108/a8c4e3672c74491a80b53a172bb753fe.shtml
-- 微信小程序用户隐私保护指引：https://developers.weixin.qq.com/miniprogram/dev/framework/user-privacy/
+## 政策、授权与调用时序
 
-## 执行流程
+- 核实用户实际可见的隐私保护指引、政策内容、进入路径、版本和可访问性；不要假定 `privacyUrl` 或 `privacy.url` 是所有小程序必须使用的统一配置。
+- `__usePrivacyCheck__`、`wx.getPrivacySetting`、`wx.openPrivacyContract`、`wx.requirePrivacyAuthorize` 与相关事件按目标平台版本和实现路径判断。某个调用或配置缺失不自动构成严重问题。
+- 将告知、平台授权、系统权限、业务同意与真实数据上传时间排列对照，核实拒绝、撤回和重新进入时的行为。UI 勾选或出现“同意”字样不证明授权有效。
+- 有网络测试授权时才核实线上可达性；无授权或无法访问时说明未核实，不把超时、非 200 或未执行请求直接写成政策不存在。
 
-### 1. 隐私政策检查
+## 权限与数据行为
 
-#### 1.1 检查配置项
-读取 `app.json`，检查：
-- `__usePrivacyCheck__` 是否为 `true`（未启用 → CRITICAL 问题，引用微信2023规范）
-- `privacyUrl` 或 `privacy.url` 是否配置（缺失 → CRITICAL 问题，引用 PIPL 第13条）
+从 `evidence/attack-surface.json` 和实际代码读取 `permissions`、`sensitive_apis` 及真实请求目录 `apis`；机械提取结果可能不含这些可选字段，缺失不等于无隐私调用。
 
-#### 1.2 检查弹窗实现
-读取 `app.js`，检查代码中是否使用：
-- `wx.getPrivacySetting()`
-- `wx.openPrivacyContract()`
-- `wx.requirePrivacyAuthorize()`
+| 对象 | 需要核实的事实 |
+|---|---|
+| `permission` | 具体 scope、目标版本要求、触发时机与用户授权结果 |
+| `requiredPrivateInfos` | 仅针对适用版本明确要求列入的接口，不将全部隐私 API 一律纳入 |
+| 隐私保护指引 | 后台实际声明的数据类型、目的与调用行为是否一致；源码通常不能完整代表后台 |
+| 实际数据 | 返回/事件里的真实字段，后续收集、展示、保存、上传、共享及保留时间 |
+| 传输 | 最终 URL、协议、发送字段与实际接收者；代码中 HTTP 字符串不能单独证明已泄露 |
 
-若未检测到且 `__usePrivacyCheck__` 为 false → HIGH 问题，建议使用 `wx.getPrivacySetting()` 实现弹窗。
+`wx.login` 返回临时 code，不直接返回 OpenID/UnionID；手机号事件可能提供 code，需要服务端交换。用户资料、位置、媒体、运动等 API 的返回内容与权限随版本和功能不同，按实际字段核实。个人信息的敏感性不能仅按 API 名机械二分，尤其不能把健康/运动数据一律标为非敏感。
 
-#### 1.3 验证隐私政策可访问性
-若配置了 `privacyUrl`：
-- 使用 `curl` 检查 HTTP 状态码
-- 非 200 → HIGH 问题，记录 URL 和状态码
+多余声明、收集敏感信息或缺少某处配置可以作为待核实问题，但要先确定实际处理、必要性和规则要求；不自动产生固定严重性。
 
-### 2. 权限声明一致性检查
+## 接收者、SDK 与主体关系
 
-#### 2.1 加载数据
-- 从 `attack_surface.json` 读取 `permissions` 字段（实际使用的 API）
-- 从 `app.json` 读取 `requiredPrivateInfos` 字段（已声明的隐私接口）
+- 非微信域名可能就是小程序运营者自己的后端；微信域名也不能替所有后续处理证明合规。域名和 SDK 包名不等于接收者身份。
+- 核实接收主体、运营者关系、处理目的、字段、服务端转发、受托/独立处理关系和授权材料。无法确认主体时明确未核实，不直接写“第三方共享”。
+- 区分仅安装、打包、初始化和实际采集/发送的 SDK。记录真实版本、初始化时机、实际行为和与政策的一致性，不按友盟、神策或插件名称预设风险等级。
+- 插件声明用于定位 provider 与版本，不能自动转为违规条目。共享事实保存在受控证据中并引用；待核实接收关系写入相应 `issues` 或 `limitations`，不生成旧 `third_party_sharing` 目录字段。
 
-#### 2.2 定义隐私接口映射
-建立隐私接口到数据类型的映射表：
-- 位置类：`chooseAddress`, `chooseLocation`, `choosePoi`, `getLocation`, `onLocationChange`, `startLocationUpdate`
-- 用户信息类：`getUserInfo`, `getUserProfile`
-- 通讯录类：`chooseContact`, `addPhoneContact`
-- 相册类：`chooseImage`, `chooseMedia`, `chooseVideo`, `saveImageToPhotosAlbum`, `saveVideoToPhotosAlbum`, `writePhotosAlbum`
-- 麦克风类：`startRecord`, `getRecorderManager`
-- 摄像头类：`camera`
-- 蓝牙类：`bluetooth`
-- 其他：`chooseInvoiceTitle`, `getWeRunData`
+## 用户权利与儿童场景
 
-#### 2.3 交叉验证
-对每个实际使用的隐私接口：
-- 检查是否在 `requiredPrivateInfos` 中声明
-- 未声明 → CRITICAL 问题，记录 API 名称、数据类型、使用位置（文件:行号），引用微信2023规范
+- 核实查阅、更正、复制、撤回、注销/删除的真实入口和人工渠道，以及服务端处理、保留例外、备份与受托方处理。搜索不到按钮或导出函数不直接证明权利无法行使。
+- 不固定要求 JSON/CSV 导出、统一15天完成注销或仅限应用内自助渠道；按适用规则与实际承诺判断。
+- 儿童关键词仅用于定位业务线索。面向对象、实际年龄范围及是否处理不满十四周岁未成年人信息需材料支持；有相关处理时核实监护人同意、专门规则、范围和删除机制。
+- 不因名称含“宝宝”或源码没有“家长同意”字样就确认儿童隐私违法。
 
-对每个声明但未使用的接口：
-- MEDIUM 问题，引用 PIPL 最小必要原则，建议移除
+## 结构与结论
 
-### 3. 数据收集分析
+必需顶层为 `skill`、`checked_at`、`source_dir`、`regulations`、`sections` 与 `limitations`。`sections` 按实际审查领域使用 `privacy_policy`、`permissions`、`data_collection`、`third_party_sdks`、`user_rights`，适用时补充 `child_protection`。每节填写 `status: reviewed/partial/not_tested`、`issues[]` 与 `limitations[]`；partial/not_tested 另填 `reason` 和非空限制，not_tested 的 issues 必须为空。reviewed 只代表做过审查，不代表合规通过。声明、调用、数据和 SDK 目录保存在受控证据或攻击面目录中并引用，不往 section 填入 schema 未定义的目录字段，不生成 PASS/FAIL 或总质量分数。
 
-#### 3.1 识别收集的数据类型
-定义数据收集 API 映射：
-- `getUserInfo/getUserProfile` → 用户昵称、头像（敏感，身份信息）
-- `getPhoneNumber` → 手机号（敏感，联系方式）
-- `getLocation/chooseAddress` → 地理位置（敏感，位置信息）
-- `getWeRunData` → 运动数据（非敏感，健康数据）
-- `chooseInvoiceTitle` → 发票抬头（敏感，财务信息）
-- `wx.login` → OpenID/UnionID（非敏感，身份标识）
+问题放在 `sections.<section>.issues[]`，使用统一 [finding.schema.json](../../miniapp-report/assets/finding.schema.json)，编号稳定为 `F-001`，不要另建顶层 `findings[]` 代替领域容器。跨节同一根因复用编号并保留关联，不重复计数。
 
-遍历实际使用的 API，提取收集的数据类型、敏感性、类别和使用位置。
+显式选择 `needs_validation`、`confirmed` 或 `rejected`；候选可有 `priority`，仅 confirmed 有 `severity`。E0 是线索，E1 是有根据的待验证路径，E2 是可复现或可独立核验的直接证据证明具体边界失效，E3 是授权测试数据上进一步证实影响范围；证据强度不按静态/动态划分。
 
-#### 3.2 标记敏感数据收集
-对每个敏感数据：
-- 生成 INFO 级别问题，标记为 `review_required: true`
-- 问题描述：收集 [数据类型] 是否业务必需？
-- 引用 PIPL 第6条（最小必要原则）
-
-#### 3.3 检查数据传输安全
-从 `attack_surface.json` 读取 `api_calls` 字段，对每个 API 调用：
-- 检查 URL 是否以 `http://` 开头（明文传输）
-  - 是 → HIGH 问题，记录 URL、方法、位置，引用 PIPL 第51条，建议使用 HTTPS
-- 检查 URL 域名是否非微信官方（不包含 `api.weixin.qq.com`）
-  - 是 → MEDIUM 问题，标记为第三方数据共享，引用 PIPL 第23条，标记 `review_required: true`
-
-### 4. 第三方 SDK 合规检查
-
-#### 4.1 识别第三方依赖
-检查 `package.json` 是否存在，若存在：
-- 读取 `dependencies` 和 `devDependencies`
-- 识别常见数据收集 SDK：
-  - `umeng-wxapp` → 友盟统计（MEDIUM 风险，设备信息+使用行为）
-  - `tencent-analytics` → 腾讯移动分析（MEDIUM 风险）
-  - `talkingdata-wxapp` → TalkingData（MEDIUM 风险）
-  - `sensors-data` → 神策数据（MEDIUM 风险）
-  - `jpush-wxapp` → 极光推送（MEDIUM 风险）
-
-#### 4.2 检查插件声明
-从 `app.json` 读取 `plugins` 字段，对每个插件：
-- 生成 INFO 级别问题，标记为 `review_required: true`
-- 问题：插件的数据处理是否在隐私政策中说明？
-- 引用 PIPL 第23条
-
-#### 4.3 生成第三方 SDK 清单
-汇总：
-- `packages` 列表（包名、版本、风险级别、收集的数据类型）
-- `plugins` 列表（插件名、provider、version）
-- `total_count` 总数
-
-### 5. 用户权利检查
-
-#### 5.1 检查账号注销功能
-查找所有 JS 文件（排除 `node_modules`），搜索注销相关模式：
-- 中文：`注销账号|注销账户|删除账号|账号注销`
-- 英文：`deleteAccount|removeAccount|cancelAccount`
-- API：`/user/delete|/account/cancel`
-
-未找到 → HIGH 问题，引用 PIPL 第47条（用户注销权），建议在个人中心添加账号注销功能。
-
-找到 → 生成 INFO 级别问题，标记为 `review_required: true`，提供检查清单：
-- 服务端是否删除用户数据？
-- 本地存储是否清理？
-- 第三方平台数据是否同步删除？
-- 是否有注销确认流程？
-- 注销是否在15天内完成？
-
-#### 5.2 检查数据导出功能
-搜索数据导出相关模式：
-- 中文：`导出数据|下载数据|个人信息副本`
-- 英文：`exportData|downloadUserData|getPersonalData`
-
-未找到 → MEDIUM 问题，引用 PIPL 第45条（数据可携带权），建议提供用户数据导出功能（JSON、CSV 等格式）。
-
-### 6. 儿童保护检查
-
-#### 6.1 判断是否面向儿童
-定义儿童关键词：`儿童|少儿|小孩|宝宝|幼儿|kids|children|baby`
-
-检查：
-- `app.json` 的 `window.navigationBarTitleText`
-- `project.config.json` 的 `description`
-
-包含关键词 → 标记为面向儿童。
-
-#### 6.2 儿童应用特殊检查
-若面向儿童：
-- 生成 HIGH 级别问题，引用 PIPL 第31条
-- 列出要求：
-  - 必须设置专门的儿童个人信息保护规则
-  - 收集儿童信息需征得监护人同意
-  - 不得超出目的范围收集儿童个人信息
-  - 停止服务时应删除儿童个人信息
-  - 不得向儿童推送商业广告
-
-#### 6.3 检查监护人同意机制
-搜索所有 JS 文件，查找模式：
-- `监护人|家长同意|parental.*consent`（正则，忽略大小写）
-
-未找到 → CRITICAL 问题，引用 PIPL 第31条，要求添加监护人同意流程。
-
-### 7. 生成合规报告
-
-#### 7.1 构建报告结构
-创建 JSON 报告：
-```
-{
-  skill: "privacy-compliance",
-  checked_at: ISO时间戳,
-  source_dir: 源码目录,
-  regulations: ["PIPL", "WeChat Privacy Specification 2023"],
-
-  summary: {
-    total_issues: 总问题数,
-    critical: CRITICAL 级别数,
-    high: HIGH 级别数,
-    medium: MEDIUM 级别数,
-    review_required: 需人工审查的数量
-  },
-
-  sections: {
-    privacy_policy: {
-      status: "PASS"/"FAIL",
-      issues: [...]
-    },
-    permissions: {
-      status: "PASS"/"FAIL",
-      declared: [...],
-      actual_used: [...],
-      issues: [...]
-    },
-    data_collection: {
-      collected_data_types: [...],
-      third_party_sharing: [...],
-      issues: [...]
-    },
-    third_party_sdks: {
-      catalog: {...},
-      issues: [...]
-    },
-    user_rights: {
-      account_deletion: true/false,
-      data_export: true/false,
-      issues: [...]
-    },
-    child_protection: {
-      targets_children: true/false,
-      issues: [...]
-    }
-  },
-
-  compliance_checklist: {...}
-}
-```
-
-#### 7.2 生成合规检查清单
-构建 `compliance_checklist`：
-
-**PIPL 合规项**：
-- 第13条（明确告知）：根据 privacy_policy 问题判定 COMPLIANT/NON_COMPLIANT
-- 第14条（规则公开）：根据 requiredPrivateInfos 是否配置判定
-- 第17条（撤回同意）：标记为 NEEDS_REVIEW（需人工审查权限撤回功能）
-- 第23条（第三方告知）：根据 SDK 总数判定 NEEDS_REVIEW/COMPLIANT
-- 第45-47条（用户权利）：根据账号注销和数据导出功能判定 COMPLIANT/PARTIAL
-
-**微信合规项**：
-- 隐私保护指引：根据 `__usePrivacyCheck__` 判定
-- requiredPrivateInfos 声明：根据未声明 API 数量判定
-- 用户信息使用描述：标记为 NEEDS_REVIEW
-
-#### 7.3 写入输出文件
-将完整报告写入 `${outputDir}/evidence/privacy-compliance.json`。
-
-## 问题分级标准
-
-- **CRITICAL**：必须修复，否则无法通过审核（如未声明隐私接口、缺少监护人同意）
-- **HIGH**：严重合规风险（如缺少注销功能、明文传输数据、隐私政策不可访问）
-- **MEDIUM**：中等风险（如过度声明权限、第三方数据共享未说明）
-- **INFO**：需人工审查（如敏感数据必要性、第三方插件说明）
-
-## 输出文件
-
-- `evidence/privacy-compliance.json` - 完整合规检查报告
-
-## 报告示例结构
-
-```json
-{
-  "skill": "privacy-compliance",
-  "summary": {
-    "total_issues": 12,
-    "critical": 1,
-    "high": 3,
-    "medium": 5,
-    "review_required": 6
-  },
-  "sections": {
-    "privacy_policy": {
-      "status": "FAIL",
-      "issues": [
-        {
-          "type": "missing_privacy_check",
-          "severity": "CRITICAL",
-          "issue": "未启用隐私保护检查",
-          "regulation": "WeChat 2023规范",
-          "fix": "在 app.json 中添加 \"__usePrivacyCheck__\": true"
-        }
-      ]
-    },
-    "permissions": {
-      "status": "FAIL",
-      "declared": ["chooseLocation"],
-      "actual_used": ["chooseLocation", "getUserProfile"],
-      "issues": [
-        {
-          "type": "undeclared_privacy_api",
-          "severity": "CRITICAL",
-          "api": "getUserProfile",
-          "data_type": "用户信息",
-          "used_in": ["pages/profile/index.js:45"],
-          "issue": "使用了隐私接口但未在 requiredPrivateInfos 中声明",
-          "regulation": "WeChat 2023规范",
-          "fix": "在 app.json 的 requiredPrivateInfos 中添加 \"getUserProfile\""
-        }
-      ]
-    },
-    "data_collection": {
-      "collected_data_types": [
-        {
-          "api": "getUserProfile",
-          "data_type": "用户昵称、头像",
-          "sensitive": true,
-          "category": "身份信息",
-          "locations": [{"file": "pages/profile/index.js", "line": 45}]
-        }
-      ],
-      "issues": []
-    },
-    "third_party_sdks": {
-      "catalog": {
-        "packages": [],
-        "plugins": [],
-        "total_count": 0
-      },
-      "issues": []
-    },
-    "user_rights": {
-      "account_deletion": false,
-      "data_export": false,
-      "issues": [
-        {
-          "type": "missing_account_deletion",
-          "severity": "HIGH",
-          "issue": "未提供账号注销功能",
-          "regulation": "PIPL 第47条 - 用户注销权",
-          "fix": "在个人中心添加账号注销功能"
-        }
-      ]
-    },
-    "child_protection": {
-      "targets_children": false,
-      "issues": []
-    }
-  },
-  "compliance_checklist": {
-    "pipl_compliance": [
-      {
-        "article": "第13条",
-        "requirement": "明确告知个人信息处理目的",
-        "status": "NON_COMPLIANT",
-        "evidence": [...]
-      }
-    ],
-    "wechat_compliance": [
-      {
-        "requirement": "隐私保护指引",
-        "status": "NON_COMPLIANT"
-      }
-    ]
-  }
-}
-```
+确认必须有 E2/E3、非空 `evidence_refs`、明确适用要求、根因、复现、影响、修复、预期与实际、复测；法律适用仍不明确时保留待核实，不能用技术证据替代法律论证。候选不进入最终风险计数，E2 足够后停止扩大数据范围。

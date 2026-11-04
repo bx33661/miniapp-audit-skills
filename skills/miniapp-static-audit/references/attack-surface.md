@@ -1,162 +1,35 @@
-> Detailed checklist. Adapt it to the target; this is not a rigid sequence.
+# 攻击面映射的判断依据
 
-# Attack Surface - 攻击面映射
+产物为 `evidence/attack-surface.json`，遵循 [attack-surface-output.schema.json](../assets/attack-surface-output.schema.json) 及其中引用的 [api-call.schema.json](../assets/api-call.schema.json)，`skill` 为 `miniapp-static-audit`。攻击面是材料目录，不是漏洞结论。
 
-## 目标
+## 识别实际调用
 
-提取小程序的攻击面：
-- HTTP/HTTPS API 调用
-- WebSocket 连接
-- 云函数调用
-- 云数据库操作
-- 上传/下载操作
-- 隐私和敏感 API
-- 权限声明
-- 域名配置
-- WebView 和插件
+- 从已有源码、配置与提取结果定位 `wx.request`、上传/下载、WebSocket、`wx.cloud.callFunction`、云数据库，以及 uni-app、Taro 和真实存在的自定义封装。
+- 先确认导入、别名和封装定义，再将名为 `request`、`http` 或 `api` 的符号认定为网络调用。字符串、注释和死代码单独注明。
+- 沿调用点追踪 URL、method、headers、参数、环境配置与拦截器。动态值无法还原就保留原表达式与未知部分，不拼接虚构域名、请求体或认证方式。
+- `wx.login` 返回临时 code；检查实际 code 交换接口、会话保存及请求注入位置。看到 token 名字不等于已认证，没见 Authorization 也不等于匿名。
+- 云调用区分客户端 SDK、云函数实现和云数据库规则；小程序材料没有后端实现时，记录服务端覆盖缺口。
 
-## 执行步骤
+## 微信特有边界
 
-### 1. 提取项目元数据
+- 从实际配置记录 AppID、页面、分包、插件、基础库与框架。区分 `app.json`、`app-config.json`、bundle 模块与 source map；框架不明使用 `unknown`。
+- 隐私相关调用包括位置、手机号事件、用户资料、相册/相机、剪贴板、录音、蓝牙与本地存储。记录真实调用位置和行为；获取、展示、保存和上传是不同操作。
+- `permission`、`requiredPrivateInfos` 和平台隐私保护指引的作用不同。只有核实具体 API、基础库及平台规则适用性后，才能记录声明差异；不能把所有隐私接口都塞入 `requiredPrivateInfos`。
+- `urlCheck` 是开发工具设置，不能证明发布环境域名校验被关闭。服务端配置的域名白名单不一定随包提供。
+- 对 `<web-view>` 追踪 src 的实际来源、跳转约束、消息处理与 native 操作。用户可控 URL 是待查边界，不直接等于 XSS。
+- 导航、插件、云环境 ID、集合名和下载文件地址都是后续核实入口；公开标识本身不是密钥或越权。
 
-读取配置文件 `app.json`、`project.config.json`、`package.json`，提取：
-- AppID（脱敏处理）
-- 项目名称
-- 框架类型（原生/uni-app/Taro/Remax）
-- 基础库版本
-- 页面列表
-- 分包列表
-- 插件列表
+## 域名与规范化
 
-### 2. 提取 HTTP/HTTPS API 调用
+- 记录实际协议、域名、用途和位置。HTTP/WS 需要结合运行环境、是否到达及承载数据核实影响；不能仅凭 URL 字面量确认泄露。
+- 自有服务、受托处理者、独立第三方与微信平台需按主体材料核实。非微信域名不自动代表第三方；未核实 `is_third_party` 时不填 `false`。
+- 按 method、实际环境/域名、路径语义归并调用，保留所有位置与参数差异。查询参数可以影响路由或权限，不可一律丢弃后合并。
+- 同路径不同主体、云环境、请求签名或身份分支应保留区别。API 编号不替代发现的稳定 `F-001` 编号。
 
-搜索所有网络请求调用模式，支持：
-- 原生：`wx.request`、`wx.uploadFile`、`wx.downloadFile`
-- uni-app：`uni.request`、`uni.uploadFile`
-- Taro：`Taro.request`
-- 第三方：`axios`、`fetch`
-- 自定义封装：`request`、`http.get`、`api.post`
+## 输出范围
 
-对每个调用提取：
-- URL（完整地址或路径模式）
-- HTTP 方法（GET/POST/PUT/DELETE）
-- 参数列表（从代码推断）
-- 请求头配置
-- 认证方式（Bearer Token/Cookie/自定义）
-- 调用位置（文件路径和行号）
+必需字段是 `skill`、`scanned_at`、`source_dir`、`metadata`、`apis`、`statistics`、`limitations`。只按实际分析填充 `cloud_functions`、`cloud_database`、`sensitive_apis`、`permissions`、`domains`、`webviews` 等 schema 支持的目录。
 
-### 3. 处理动态 URL
+机械提取器可能只覆盖静态 URL、参数或部分配置；它没有分析的 `cloud_database`、`sensitive_apis`、`request_wrappers`、`permissions.used/undeclared` 及相应统计可以缺失。读取 `limitations`，随后按本参考核实；字段缺失不代表零调用、零风险或检查通过。只有实际完成该项检查才报告零数量。
 
-识别 BaseURL 配置：
-- 查找 `BASE_URL`、`API_BASE`、`baseUrl` 等常量定义
-- 追踪配置来源（硬编码/配置文件/环境变量）
-- 拼接完整 URL 模式
-
-识别统一请求封装：
-- 查找 `utils/request.js`、`api/index.js` 等封装文件
-- 提取封装函数位置
-- 记录是否添加认证头
-- 记录拦截器逻辑
-
-### 4. 提取云函数调用
-
-搜索 `wx.cloud.callFunction`、`wx.cloud.database()`、`wx.cloud.uploadFile` 调用，提取：
-- 云函数名称
-- 传入参数结构
-- 调用位置
-
-### 5. 提取隐私和敏感 API
-
-搜索所有隐私 API 调用：
-- 位置：`wx.getLocation`、`wx.chooseLocation`
-- 用户信息：`wx.getUserProfile`、`wx.getUserInfo`、`getPhoneNumber`
-- 相册相机：`wx.chooseImage`、`wx.chooseMedia`、`wx.chooseVideo`
-- 剪贴板：`wx.getClipboardData`、`wx.setClipboardData`
-- 存储：`wx.setStorage`、`wx.getStorage`、`wx.setStorageSync`
-- 录音蓝牙：`wx.startRecord`、`wx.getRecorderManager`、`wx.startBluetoothDevicesDiscovery`
-
-记录每个调用的位置和上下文。
-
-### 6. 检查权限声明
-
-从 `app.json` 提取 `permission` 和 `requiredPrivateInfos` 字段。
-
-对比分析：
-- 列出所有声明的权限
-- 列出所有实际调用的 API
-- 标记未声明但被使用的 API（合规风险）
-
-### 7. 提取域名配置
-
-从配置文件提取：
-- `project.config.json` 中的 `urlCheck` 设置
-- 请求域名白名单配置
-
-从代码提取：
-- 硬编码的完整 URL
-- BaseURL 配置值
-- WebSocket 地址
-
-分类域名：
-- HTTPS vs HTTP（标记 HTTP 为不安全）
-- WSS vs WS
-- 自有域名 vs 第三方域名
-
-### 8. 提取 WebView 组件
-
-搜索 `<web-view>` 标签，提取：
-- WebView 的 src 属性（静态或动态）
-- 判断 URL 是否用户可控（XSS 风险）
-- 记录调用位置
-
-### 9. API 去重和规范化
-
-按 `method + 规范化端点` 去重：
-- 提取 URL 路径模式（去除查询参数值）
-- 合并相同端点的不同参数调用
-- 保留所有调用位置引用
-
-### 10. 生成输出
-
-生成 `evidence/attack-surface.json`，包含：
-
-主要字段：
-- `skill`: "attack-surface"
-- `scanned_at`: ISO 8601 时间戳
-- `source_dir`: 源码目录路径
-- `metadata`: 项目元数据（app_id、app_name、framework、pages_count、subpackages_count）
-- `apis`: API 调用列表，每项包含：
-  - `id`: API-001, API-002...
-  - `type`: http/websocket/cloud
-  - `method`: GET/POST/PUT/DELETE
-  - `url`: 完整 URL
-  - `url_pattern`: 路径模式
-  - `params`: 参数列表
-  - `auth`: 认证信息（type、source）
-  - `locations`: 调用位置数组（file、line）
-  - `wrapper`: 封装信息（type、interceptor）
-  - `domain`: 域名
-  - `protocol`: https/http/wss/ws
-  - `risk_indicators`: 风险标记数组
-- `cloud_functions`: 云函数列表
-- `sensitive_apis`: 敏感 API 列表
-- `permissions`: 权限对比（declared、used、undeclared）
-- `domains`: 域名列表
-- `webviews`: WebView 列表
-- `statistics`: 统计信息（total_apis、http_apis、cloud_functions、sensitive_apis、third_party_domains）
-
-## 工具使用
-
-使用 `rg`（ripgrep）搜索代码模式：
-- 搜索 API 调用：`rg "wx\.request\(" --type js --json`
-- 搜索云函数：`rg "wx\.cloud\.callFunction" --type js -A 5`
-- 搜索敏感 API：`rg "(getLocation|getUserProfile|chooseImage)" --type js`
-
-可选：使用 `ast-grep` 进行 AST 级别精确搜索。
-
-可选：动态生成 Node.js 脚本使用 @babel/parser 和 @babel/traverse 进行 AST 解析。
-
-## 输出文件
-
-- `evidence/attack-surface.json` - 完整攻击面报告
-- `evidence/api-calls.json` - API 调用详细列表（可选，引用主输出）
+把可验证的边界疑点交给鉴权、支付、隐私或数据流分析，引用原始调用位置，显式记录 `needs_validation`。`confirmed` 需要 E2/E3 直接证据及完整根因、复现、影响、修复、预期与实际、复测和非空证据引用；`rejected` 保留排除依据。目录命中不直接进入最终风险计数。

@@ -1,75 +1,115 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wxray.dev/schemas/evidence.schema.json",
   "title": "Evidence",
-  "description": "证据记录，追踪审计发现的来源",
+  "description": "evidence.json 数组中的单条证据；artifact.file 为可定位的源文件或证据制品路径。",
   "type": "object",
-  "required": ["evidence_id", "source_skill", "collected_at", "type"],
+  "required": [
+    "evidence_id",
+    "source_skill",
+    "collected_at",
+    "type",
+    "artifact",
+    "content_redacted"
+  ],
   "properties": {
     "evidence_id": {
       "type": "string",
-      "pattern": "^EV-[0-9]{3,}$",
-      "description": "证据唯一ID，格式：EV-001"
+      "pattern": "^EV-[0-9]{3,}$"
     },
     "source_skill": {
-      "type": "string",
-      "description": "产生此证据的 Skill 名称",
-      "examples": ["secret-scan", "attack-surface", "authz-analyzer"]
+      "enum": [
+        "miniapp-audit",
+        "miniapp-recon",
+        "miniapp-threat-model",
+        "miniapp-static-audit",
+        "miniapp-dynamic",
+        "miniapp-report"
+      ]
     },
     "collected_at": {
       "type": "string",
-      "format": "date-time",
-      "description": "证据收集时间（ISO 8601）"
+      "minLength": 1,
+      "pattern": "\\S",
+      "format": "date-time"
     },
     "type": {
-      "type": "string",
-      "enum": ["source_code", "config", "api_response", "tool_output", "dynamic_test"],
-      "description": "证据类型"
+      "enum": [
+        "source_code",
+        "config",
+        "api_response",
+        "tool_output",
+        "dynamic_test"
+      ]
     },
     "artifact": {
       "type": "object",
-      "description": "证据来源的制品信息",
+      "required": [
+        "file"
+      ],
       "properties": {
         "file": {
           "type": "string",
-          "description": "文件路径（相对于源码根目录）"
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "line_start": {
           "type": "integer",
-          "minimum": 1,
-          "description": "起始行号"
+          "minimum": 1
         },
         "line_end": {
           "type": "integer",
-          "minimum": 1,
-          "description": "结束行号"
+          "minimum": 1
         },
         "hash": {
           "type": "string",
-          "description": "文件内容的 SHA256 哈希"
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S",
+          "description": "JSON Pointer、测试编号或请求记录标识"
         }
       }
     },
     "content_redacted": {
       "type": "string",
-      "description": "证据内容（敏感值已脱敏）"
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "实际代码、配置、请求响应或工具结果的脱敏摘录，不接受仅有路径或“已脱敏”等占位说明。"
     },
     "metadata": {
       "type": "object",
-      "description": "额外元数据",
       "properties": {
         "tool": {
           "type": "string",
-          "description": "使用的工具"
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         },
         "rule_id": {
           "type": "string",
-          "description": "匹配的规则ID"
+          "minLength": 1,
+          "pattern": "\\S"
         },
-        "confidence": {
+        "environment": {
           "type": "string",
-          "enum": ["HIGH", "MEDIUM", "LOW"],
-          "description": "置信度"
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "account_role": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "limitations": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
         }
       }
     }

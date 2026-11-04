@@ -1,28 +1,32 @@
 {
+  "purpose": "Search hints for manual source-path-decision-constraint review, not vulnerability or protection verdicts.",
+  "matching": "Patterns are literal search hints; resolve bindings, execution context and reachable paths before using a match.",
   "sources": [
-    {"name": "page options", "patterns": ["options.", "query.", "e.currentTarget.dataset"]},
-    {"name": "storage", "patterns": ["wx.getStorage", "wx.getStorageSync"]},
-    {"name": "network response", "patterns": ["res.data", "response.data"]},
-    {"name": "user input", "patterns": ["bindinput", "bindtap", "form"]},
-    {"name": "clipboard", "patterns": ["wx.getClipboardData"]},
-    {"name": "QR scene", "patterns": ["scene", "query.scene"]}
+    {"name": "page input", "patterns": ["options.", "query.", "scene", "e.detail.value", "e.currentTarget.dataset"], "verify": "Identify the actual event/page entry and attacker-controlled fields; resolve aliases and overwrites."},
+    {"name": "storage", "patterns": ["wx.getStorage", "wx.getStorageSync"], "verify": "Find writers and the actual trust boundary; storage alone does not establish the value's origin."},
+    {"name": "network response", "patterns": ["res.data", "response.data"], "verify": "Resolve the response binding, sender and downstream consumers."},
+    {"name": "clipboard", "patterns": ["wx.getClipboardData"], "verify": "Identify the returned value and reachable consumer."},
+    {"name": "cloud event", "patterns": ["exports.main", "event."], "verify": "Resolve the cloud-function entry, caller controls and trusted platform context."}
   ],
   "sinks": [
-    {"name": "wx.request", "patterns": ["wx.request", "request("]},
-    {"name": "cloud call", "patterns": ["wx.cloud.callFunction", "cloud.database"]},
-    {"name": "web-view", "patterns": ["web-view", "src="]},
-    {"name": "file", "patterns": ["wx.openDocument", "wx.saveFile", "fs."]},
-    {"name": "render", "patterns": ["innerHTML", "rich-text", "WXS"]},
-    {"name": "navigation", "patterns": ["wx.navigateTo", "wx.redirectTo"]}
+    {"name": "network", "patterns": ["wx.request", "wx.uploadFile", "wx.downloadFile", "wx.connectSocket"], "verify": "Resolve the final destination, execution principal, payload and response use; a request is not automatically SSRF."},
+    {"name": "cloud operation", "patterns": ["wx.cloud.callFunction", "wx.cloud.database", "cloud.database"], "verify": "Resolve the function or collection, deployed authorization rules and resource ownership."},
+    {"name": "webview", "patterns": ["web-view", "postMessage"], "verify": "Trace the final URL, redirects, message origin and privileged message handlers."},
+    {"name": "file", "patterns": ["getFileSystemManager", "wx.openDocument", "wx.saveFile"], "verify": "Resolve filesystem roots, canonical paths, accessible files and actual side effects."},
+    {"name": "render", "patterns": ["innerHTML", "rich-text"], "verify": "Establish the actual rendering context and component execution restrictions before alleging injection."},
+    {"name": "navigation", "patterns": ["wx.navigateTo", "wx.redirectTo", "wx.navigateToMiniProgram"], "verify": "Resolve destination and parameters, then identify any security-sensitive action at the target."},
+    {"name": "backend operation", "patterns": [".query(", ".execute(", "child_process", "exec("], "verify": "Confirm the binding is a real database/command API, the runtime is reachable and controlled values enter executable syntax."},
+    {"name": "logging", "patterns": ["console.log", "logger."], "verify": "Identify actual sensitive values, recipients and access conditions; logging text alone does not prove disclosure."}
   ],
   "guards": [
-    {"name": "server authorization", "patterns": ["openid", "getWXContext", "session", "role"]},
-    {"name": "allowlist", "patterns": ["allowlist", "whitelist", "includes("]},
-    {"name": "encoding", "patterns": ["encodeURIComponent", "escape", "sanitize"]},
-    {"name": "parameterization", "patterns": ["prepare", "parameterized", "bind"]}
+    {"name": "identity decision hint", "patterns": ["openid", "getWXContext", "session", "role"], "verify": "Identify trusted identity provenance, ownership/tenant checks, enforced branches and any client-controlled override. These words do not establish authorization."},
+    {"name": "allowlist hint", "patterns": ["allowlist", "whitelist", "includes("], "verify": "Inspect the actual permitted semantic values, normalization, failure behavior and coverage of all paths."},
+    {"name": "encoding hint", "patterns": ["encodeURIComponent", "escape", "sanitize"], "verify": "Inspect the implementation, final decoding and sink context. A function name or encoding step does not establish protection."},
+    {"name": "parameterization hint", "patterns": ["prepare", "parameterized", "bind"], "verify": "Confirm real API semantics and separation of data from executable structure at the final operation."}
   ],
   "transforms": [
-    {"name": "decode", "patterns": ["decodeURIComponent", "atob", "JSON.parse"]},
-    {"name": "string concat", "patterns": ["+", "${"]}
+    {"name": "decoding", "patterns": ["decodeURIComponent", "atob", "JSON.parse"], "verify": "Track the parsed output and whether validation occurred before or after decoding."},
+    {"name": "composition", "patterns": ["+", "${", "Object.assign"], "verify": "Resolve operands and properties rather than assuming text proximity proves a path."},
+    {"name": "serialization", "patterns": ["JSON.stringify", "encodeURIComponent"], "verify": "Track later parsing and the final security decision; serialization does not establish authorization or sanitization."}
   ]
 }

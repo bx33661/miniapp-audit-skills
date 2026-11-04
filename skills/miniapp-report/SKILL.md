@@ -1,107 +1,64 @@
 ---
 name: miniapp-report
-description: "当把微信小程序审计证据整理成报告时使用：归一化发现、分配严重性和置信度、编写可复现发现、覆盖范围和复测标准。触发词：小程序审计报告, 漏洞报告, 证据整理, 复测."
+description: "整理微信小程序审计证据：归一化发现、确认门、风险决策、中文报告与复测。"
 license: MIT
-compatibility: "需要文件系统访问和 Bash。读取 JSON 证据，输出 Markdown 和 JSON。"
+compatibility: "读取 JSON 证据，输出 Markdown 和 JSON。"
 metadata:
   version: "2.0"
   category: security-audit
   author: WxRay
-allowed-tools: Bash Read Write
+allowed-tools: Read Write Bash
 ---
 
 # 微信小程序审计报告
 
 ## 目的
 
-产出可决策的报告：哪些已确认、哪些是假设、哪些没有测试，以及如何修复和复测。
+把可追溯证据整理为修复决策，明确已确认、待验证、已排除以及覆盖未知。可直接接收运行测试或已有证据，不要求材料盘点、解包和静态阶段先完成。
 
-报告不是数据堆砌。它应让工程团队能够排序修复，让复核者能够重现证据。
+## 输入与字段映射
 
-## 原则
+按本次实际执行的阶段读取 evidence 目录中的可用输入；缺少不相关阶段产物不阻塞报告，未执行阶段保留覆盖说明。
 
-- **证据分级。** E0、E1 是假设；E2、E3 是已确认。不要把两者混在一起。
-- **严重性与置信度分开。** 严重性反映影响和可能性；置信度反映证据强度。
-- **根因在边界。** 写明服务端信任了哪个客户端可控输入，缺失了哪道控制。
-- **修复在服务端。** 隐藏按钮、增加前端校验或修改错误提示不是修复。
-- **覆盖是结果的一部分。** 带明确限制的短报告，比没有证据的“全面覆盖”更有用。
-- **专业表述。** 陈述事实、证据和影响；避免营销语言、表情和夸大的严重性。
+| 文件 | 读取内容 | 处理 |
+| --- | --- | --- |
+| `material-check.json` | 材料检查记录 | 材料可用性与限制，不能作为漏洞计数 |
+| `attack-surface.json` | 攻击面记录 | 资产、入口与覆盖上下文 |
+| `secret-scan.json` | `secrets[]` | 原始候选；脱敏后整理为待验证发现，不凭匹配确认泄露影响 |
+| `authz-findings.json` | `findings[]` | 直接使用统一 finding 字段 |
+| `payment-findings.json` | `findings[]` | 直接使用统一 finding 字段 |
+| `dataflow-analysis.json` | `findings[]` | 直接使用统一 finding 字段，保留 `dataflow` |
+| `privacy-compliance.json` | `sections.<section>.issues[]` | 直接使用统一 finding 字段；检查项通过不代表整个领域安全 |
+| `dynamic-test-results.json` | `requests[]`、`findings[]`、`limitations` | 请求清单用于捕获/重放覆盖，按 finding_id 关联安全实验，不把成功重放当漏洞 |
+
+状态仅为 `confirmed`、`needs_validation`、`rejected`，不设默认值。领域统一记录缺少状态或关键字段时记录输入错误，不猜测状态。原始 secret 候选首次归一化时分配稳定 `F-001` 编号并保存来源映射；已有编号不得重建。证据采用 `EV-001` 编号。
+
+动态结果仅有 `CONFIRMED`、`INCONCLUSIVE`、`BLOCKED`、`FALSE_POSITIVE`，实验结果不等于最终发现状态或严重性。成功实验仍须满足确认门；受阻或不确定应记录缺失事实；排除必须给出针对原主张的反证理由。
 
 ## 工作流
 
-1. **加载证据。** 材料清单、威胁模型、静态假设、动态证据和覆盖记录。
-2. **归一化与去重。** 同一根因和同一受影响控制的发现合并；影响或修复不同的发现分开。
-3. **校验契约。** 用 `assets/` 下的 schema 检查发现和证据；逐项核对必填字段、枚举和证据等级。
-4. **分配证据等级。** E0/E1 进入待确认或观察项；E2/E3 进入已确认。
-5. **分配严重性和置信度。** 使用 `../miniapp-audit/references/severity.md`，并给出理由。
-6. **编写每个发现。** 通过下面的发现质量门。
-7. **编写覆盖与限制。** 标记已测、部分和未测，说明原因。
-8. **编写执行摘要。** 总体风险、已确认问题、关键依赖和修复顺序。
-9. **定义复测标准。** 写明修复后必须失败的请求或行为。
+1. 按 `references/report-builder.md` 加载输入，区分缺失、解析失败、结构无效和成功读取的空数组。
+2. 根据根因、失效边界和受影响资产去重，保留来源、证据和稳定编号。
+3. 按 `assets/finding.schema.json`、`assets/evidence.schema.json` 校验单条记录；核对跨文件证据引用和事实。
+4. 确认必须有具体 asset、E2/E3、severity 及 severity_reason、非空证据引用、根因、前置条件、复现、影响、修复、验证方法、预期/实际与复测标准。未满足时补证或明确降为待验证并去掉 severity，不能制造内容以过门。
+5. 仅对 confirmed 分配严重性，按 `../miniapp-audit/references/severity.md` 解释已证明的影响及条件；候选和排除项仅可有 priority。
+6. 写入数组形式的 `findings.json`、`evidence.json` 和简洁 `report.md`，使用 `assets/report-template.md`。按需要附清单，不强制输出无关专题或额外大文档。
 
-## 领域输入映射
+## 证据与风险
 
-各领域输出是候选假设，不是最终 finding。归一化时映射到统一字段：
+E0 是线索，E1 是有根据的待验证路径，E2 是可复现或可独立核验的直接证据证明具体边界失效，E3 是授权测试数据上进一步证实影响范围。证据强度不由静态或动态手段决定；E2 足够后不追求更大影响。E2/E3 本身不自动决定状态。
 
-| 输入 | 主要内容 | 映射要点 |
-|---|---|---|
-| `authz-findings.json` | `findings[]` | 对象/角色标识、缺失校验映射到 `asset`、`root_cause`、`reproduction` |
-| `payment-findings.json` | `findings[]` 或 `vulnerabilities[]` | 价格、订单状态、回调校验映射到 `asset`、`impact`、`remediation` |
-| `dataflow-output.json` | `findings[]` | `source`、`sink`、`guards` 映射到 `asset`、`root_cause`、`reproduction` |
-| `secret-scan-output.json` | `secrets[]` | 规则、文件、行号映射到 `locations`；密钥值脱敏 |
-| `dynamic-test-results.json` | `confirmed_vulnerabilities[]`、`all_tests[]` | 只有复现结果映射为 `verified`；保留请求、响应和证据等级 |
-| `privacy-compliance-output.json` | `sections[]`、`findings[]` | 合规项映射到 `category: compliance`；严重性只作候选 |
+最终风险计数只包含 confirmed 的 severity。待验证与排除项分别列数量、缺失事实或理由，不推高总体风险。总体判断需说明已证实影响、可达条件、现有控制和覆盖限制，不按最高标签自动计算。无确认发现时写“本次范围内未形成已确认发现”，并列未知，不能据此宣告安全。
 
-字段缺失时保留在待确认部分，不猜测。
+## 交付与校验
 
-## 发现质量门
+`findings.json` 与 `evidence.json` 顶层均为数组；两个 schema 分别描述单条元素。仓库根目录的统一校验命令为 `python3 scripts/validate_outputs.py --evidence-dir <dir>`，由集成阶段执行。schema 不能代替证据内容审查、引用存在性和跨记录唯一性检查。
 
-一个发现只有包含以下内容才能进入正式报告：
-
-- 标题、严重性、置信度和证据等级。
-- 受影响资产：端点、云函数、页面、存储路径或组件。
-- 前置条件：账号、角色、环境和配置。
-- 复现：完整请求/响应或步骤，密钥和个人信息已脱敏。
-- 根因：失效的信任边界和缺失的服务端控制。
-- 影响：数据、资金、权限或合规风险；尽量量化。
-- 修复：服务端或云函数修复，以及验证方法。
-- 参考：适用的 CWE 和 OWASP 映射。
-- 覆盖说明：哪些未测试内容可能影响结论。
-
-缺少任意一项，发现留在待确认部分。
-
-## 报告结构
-
-1. 审计信息：目标、版本、时间、范围、授权和限制。
-2. 执行摘要：总体风险、已确认发现、修复优先级。
-3. 系统与攻击面：角色、资产、API、云函数、web-view 和支付流程。
-4. 覆盖矩阵：已测、部分、未测。
-5. 已确认发现：按严重性和业务影响排序。
-6. 待确认项：E1 假设和验证步骤。
-7. 修复计划：负责人、优先级和复测标准。
-8. 附录：API 清单、域名、SDK 和证据索引。
-
-## 质量门
-
-- 每个已确认发现通过发现质量门。
-- 严重性和置信度有理由，不来自模式匹配。
-- 覆盖和限制明确。
-- 报告不包含密钥或个人信息。
-- 复测标准可观察、具体。
-- 报告区分已确认、待确认和未测试。
+证据须脱敏，保留可定位来源、时间和实际摘录。HTTP 证据无需虚构源码行号。记录受限原始证据的保留与删除要求，不向授权范围外发布利用细节。
 
 ## 参考
 
-- `references/report-builder.md` — 详细报告生成指引。
-- `references/evidence-standard.md` — 证据等级、脱敏和保留。
-- `../miniapp-audit/references/severity.md` — 严重性、置信度和影响。
-- `assets/report-template.md` — 报告模板。
-- `assets/finding.schema.json` — 发现契约。
-- `assets/evidence.schema.json` — 证据契约。
-
-## 安全边界
-
-- 脱敏凭证、Token 和个人信息。
-- 不向授权范围之外发布利用细节。
-- 记录数据保留和删除要求。
-- 将原始证据保存在受限目录。
+- `references/report-builder.md`：归一化、去重、确认门和决策。
+- `references/evidence-standard.md`：证据等级与追溯。
+- `assets/report-template.md`：中文填写模板。
+- `assets/finding.schema.json`、`assets/evidence.schema.json`：单条记录契约。

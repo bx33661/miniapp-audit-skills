@@ -1,0 +1,457 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "environment",
+    "scope",
+    "accounts",
+    "requests"
+  ],
+  "properties": {
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "entry_mode": {
+      "enum": [
+        "traffic",
+        "hypothesis"
+      ]
+    },
+    "redact_fields": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origins",
+        "methods",
+        "max_requests",
+        "timeout_seconds",
+        "max_response_bytes"
+      ],
+      "properties": {
+        "origins": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/origin"
+          }
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ]
+          }
+        },
+        "max_requests": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        },
+        "max_response_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "proxy": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^http://[^/?#@\\s]+/?$"
+        },
+        "ca_file": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "accounts": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "origins"
+        ],
+        "properties": {
+          "origins": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/definitions/origin"
+            }
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "value_env"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+                },
+                "value_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              }
+            }
+          },
+          "cookie_env": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "expired_status": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          },
+          "expired_json": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/json_check"
+            }
+          }
+        }
+      }
+    },
+    "requests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "account",
+          "action",
+          "method",
+          "url",
+          "expect"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$"
+          },
+          "account": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "source_ref": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "method": {
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://[^#\\s]+$"
+          },
+          "headers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/header"
+            }
+          },
+          "body": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "none"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "text"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "json"
+                  },
+                  "value": {}
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "form"
+                  },
+                  "value": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "value"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "base64"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "path"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "file"
+                  },
+                  "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  }
+                }
+              }
+            ]
+          },
+          "signature": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type",
+              "key_env"
+            ],
+            "properties": {
+              "type": {
+                "const": "hmac-sha256"
+              },
+              "key_env": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+              },
+              "key_encoding": {
+                "enum": [
+                  "utf8",
+                  "hex",
+                  "base64"
+                ]
+              },
+              "timestamp_header": {
+                "type": "string",
+                "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+              },
+              "nonce_header": {
+                "type": "string",
+                "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+              },
+              "signature_header": {
+                "type": "string",
+                "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+              }
+            }
+          },
+          "encryption": {
+            "$ref": "#/definitions/crypto"
+          },
+          "response_encryption": {
+            "$ref": "#/definitions/crypto"
+          },
+          "expect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status"
+            ],
+            "properties": {
+              "status": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599
+                }
+              },
+              "json": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/json_check"
+                }
+              },
+              "contains": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Explicit miniapp HTTP replay plan",
+  "description": "已知请求协议的执行计划，不替代授权、业务判断或未知签名/加密协议分析。",
+  "definitions": {
+    "origin": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://[^/?#@\\s]+/?$"
+    },
+    "json_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pointer",
+        "equals"
+      ],
+      "properties": {
+        "pointer": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~]|~[01])*)?$"
+        },
+        "equals": {}
+      }
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[^\\r\\n]*$"
+        }
+      }
+    },
+    "crypto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "key_env"
+      ],
+      "properties": {
+        "type": {
+          "const": "aes-gcm"
+        },
+        "key_env": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+        },
+        "aad": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

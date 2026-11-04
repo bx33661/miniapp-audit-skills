@@ -1,0 +1,26 @@
+{
+  "environment": "replace-with-authorized-environment",
+  "entry_mode": "hypothesis",
+  "scope": {
+    "origins": ["https://api.example.invalid"],
+    "methods": ["GET"],
+    "max_requests": 3,
+    "timeout_seconds": 5,
+    "max_response_bytes": 1048576
+  },
+  "accounts": {
+    "A": {
+      "origins": ["https://api.example.invalid"],
+      "headers": [{"name": "Authorization", "value_env": "MINIAPP_A_AUTH"}]
+    },
+    "B": {
+      "origins": ["https://api.example.invalid"],
+      "headers": [{"name": "Authorization", "value_env": "MINIAPP_B_AUTH"}]
+    }
+  },
+  "requests": [
+    {"id": "own-a", "account": "A", "action": "Read A's authorized test object", "method": "GET", "url": "https://api.example.invalid/orders/a", "expect": {"status": [200]}},
+    {"id": "own-b", "account": "B", "action": "Read B's authorized test object", "method": "GET", "url": "https://api.example.invalid/orders/b", "expect": {"status": [200]}},
+    {"id": "a-to-b", "account": "A", "action": "Compare A requesting B's test object", "method": "GET", "url": "https://api.example.invalid/orders/b", "expect": {"status": [200, 403, 404]}}
+  ]
+}

@@ -1,63 +1,15 @@
-# Dynamic Testing Safety
+# 动态测试执行边界
 
-Dynamic testing can change state, consume resources and expose personal data. The rules below are strict because the impact is real.
+发送请求或改变测试环境前检查。已有授权有效时沿用；新增目标、账号、操作或环境变更超出范围才补充确认。
 
-## Authorization
+## 范围与操作
 
-- Obtain written authorization that names the target, environment and time window.
-- Confirm whether production testing is allowed; default to read-only.
-- Confirm the accounts and roles that may be used.
-- Confirm data handling, retention and deletion requirements.
+授权应覆盖目标、环境、时间、账号角色、操作种类、请求上限、停止条件与数据规则。域名含 test 或模板标 safe 不构成受控环境证明。
 
-If authorization is unclear, do not send requests.
+默认只读，但 GET 也可能改变状态。写操作使用授权测试数据、明确允许的动作、原始状态记录与回滚方案；不执行真实支付、退款、生产删除或权限变更。竞态和重复请求先有成功单次基线，再按批准的次数与速率执行，禁止无界并发或枚举。
 
-## Scope
+## 停止与保留
 
-- Test only the hosts, mini programs and cloud environments in scope.
-- Do not pivot to internal services, third-party systems or other tenants.
-- Do not test payment, refund, deletion or privilege changes without explicit approval and a controlled environment.
-- Record out-of-scope observations without testing them.
+出现真实他人数据、真实资金或生产影响、持续 5xx、超时或服务不稳定时停止。记录触发条件和最小脱敏证据，不继续扩大影响。无法保持范围、有效会话或签名时记录 BLOCKED。
 
-## Accounts and data
-
-- Use dedicated test accounts and synthetic data.
-- Do not use another person's credentials or personal data.
-- If a test returns real user data, stop, record the minimum evidence and delete the data.
-- Do not enumerate identifiers beyond what is necessary to prove the issue.
-- Redact tokens, cookies, phone numbers, identity numbers and addresses in notes.
-
-## Rate and impact
-
-- Use the lowest request rate that produces a valid result.
-- Respect published or observed rate limits.
-- Stop on 5xx spikes, timeouts, instability or signs of resource exhaustion.
-- Do not run denial-of-service, stress or high-concurrency tests without explicit approval.
-
-## State changes
-
-- Prefer read-only requests.
-- If a write is required, use a test account and a reversible action.
-- Never complete a real payment, refund or settlement.
-- Record the original state and the cleanup action.
-- Verify cleanup after the test.
-
-## Evidence handling
-
-- Store raw evidence in a restricted directory.
-- Redact secrets and personal data before sharing.
-- Keep a minimal reproduction; do not retain bulk personal data.
-- Record the tool, timestamp, account role and request identifier.
-- Delete evidence according to the agreed retention period.
-
-## Stop conditions
-
-Stop immediately when:
-
-- Authorization is missing or exceeded.
-- Real user data is exposed.
-- A payment, refund or destructive action would execute.
-- The service becomes unstable or returns repeated 5xx errors.
-- The target shows signs of production impact.
-- The test requires bypassing a control beyond the agreed scope.
-
-Record the stop condition and notify the authorized contact.
+原始凭证与流量保存在受限位置；共享副本脱敏 Token、Cookie、认证头、手机号、地址和其它个人信息。不得把目标源码、流量或密钥上传到未授权服务。按约定保留期限删除材料；状态变更需验证回滚结果，未完成清理明确记录。

@@ -1,382 +1,43 @@
-> Detailed checklist. Adapt it to the target; this is not a rigid sequence.
+# 支付边界与业务状态核实
 
-# Payment Audit - 支付安全专项审计
+产物为 `evidence/payment-findings.json`，遵循 [payment-findings.schema.json](../assets/payment-findings.schema.json)，`skill` 为 `miniapp-static-audit`。从真实支付入口和 `evidence/attack-surface.json` 还原业务过程；搜索 `pay`、`amount`、`order` 只用于定位。
 
-## 功能
+必需顶层为 `skill`、`scanned_at`、`source_dir`、`findings`、`limitations`，可用 `flows[]` 记录实际流程上下文；`findings[]` 使用 [finding.schema.json](../../miniapp-report/assets/finding.schema.json)，按状态填写其条件必需字段，不输出旧 `summary` 或机械严重性统计。
 
-对小程序支付流程进行安全分析：
-- 支付流程完整性检查
-- 价格篡改风险
-- 订单状态管理
-- 支付回调验证
-- 重放和重复支付保护
-- 优惠券和折扣安全
+## 区分客户端表现和可信支付结果
 
-## 执行流程
+- 定位订单创建、金额/优惠计算、预支付参数获取、`wx.requestPayment` 或实际使用的支付接口、客户端回调、服务端通知/查单、履约及退款。
+- 对每段记录已提供的实现、端点及可见状态。小程序包通常无法证明服务端通知的验签或事务逻辑，未提供必须写成覆盖限制。
+- 客户端携带价格、折扣、状态或调用确认接口，不自动证明服务端信任这些值；只传商品 ID 也不证明定价安全。
+- 客户端 `success` 可触发查单或刷新 UI。只有该路径实际导致未经可信支付确认的已支付状态或履约，才支持支付绕过。
+- 区分业务订单状态、支付渠道交易状态、履约与余额变化，不以页面提示、HTTP 200 或一份可伪造响应代替状态核实。
 
-### 1. 识别支付流程
+## 需要核实的约束
 
-#### 1.1 搜索支付相关代码
+| 边界 | 需要回答的问题 | 授权测试思路 |
+|---|---|---|
+| 金额与商品 | 服务端是否按可信商品、规格、数量、币种与价格版本重新计算，核对实际支付金额 | 用测试商品构建正常基线，一次只改金额、数量、币种或规格，核对订单及渠道侧金额 |
+| 优惠资格 | 优惠券归属、门槛、有效期、叠加与次数是否在可信位置约束 | 使用测试券对照资格，核实被拒绝或实际核销，避免重复消耗真实优惠 |
+| 订单归属 | 支付、查单、取消、退款和确认是否绑定身份、租户与订单 | 使用 A/B 测试订单交换 ID，检查实际状态和资金操作权限 |
+| 支付确认 | 服务端是否验签/解密、核对商户和应用、订单、金额/币种、成功交易状态 | 结合实际支付协议版本检查实现；在沙箱核实伪造客户端成功不能履约 |
+| 幂等与状态 | 重复通知、重复点击、过期/关闭订单是否被业务状态机和事务约束 | 在沙箱对测试订单做有限次重复操作，核对是否产生重复扣减、发货或入账 |
+| 退款与逆向流程 | 金额上限、原交易绑定、操作者权限和重复退款是否受控 | 使用可回滚测试交易核实，记录前后金额和状态 |
 
-```bash
-# 微信支付 API
-rg "wx\.requestPayment|wx\.requestPluginPayment" --type js -A 10
+状态机以目标真实业务为准；不强制所有业务采用固定状态序列。订单号由客户端生成、短小或可预测，只能提示检查碰撞、归属和重放，不直接判漏洞。
 
-# 支付相关函数
-rg "(pay|payment|order|checkout)" --type js -i
+## 微信支付实现上下文
 
-# 订单创建
-rg "(createOrder|placeOrder|submitOrder)" --type js -A 10
-```
+先辨明微信支付 API 版本、普通商户/服务商模式、JSAPI/插件支付和通知协议。不同版本的验签、平台证书/公钥、API 密钥和通知解密要求不同，不提供一份通用伪验签实现。
 
-#### 1.2 提取支付流程
+服务端不应仅信任通知外形或客户端结果；核实处理代码是否在验签与业务绑定后才能改变支付状态。`notify_url` 未出现在客户端包中并不证明没有服务端通知；即使存在通知 URL，也不能证明验签正确。
 
-完整流程：
-```
-商品选择 → 订单创建 → 价格计算 → 支付请求 → 支付回调 → 订单确认 → 发货
-```
+云函数、网关与回调处理的身份、支付应用/商户绑定、重试与事务行为需要实际材料。未提供后端时，将精确的待验证假设和最小实验交接动态阶段，不臆造响应或补造“服务器未验证”事实。
 
-提取关键节点：
-- **订单创建 API**：`/api/order/create`
-- **价格计算**：客户端 or 服务端？
-- **支付统一下单**：`/api/payment/prepay`
-- **支付调用**：`wx.requestPayment()`
-- **客户端回调**：`wx.requestPayment({success: ...})`
-- **服务端回调**：异步通知 URL
+## 测试边界与输出
 
-### 2. 价格篡改检查
-
-#### 2.1 客户端价格传递
-
-**危险模式**：客户端计算并传递支付金额
-```javascript
-// 危险：客户端计算总价
-const totalPrice = this.data.goodsPrice * this.data.quantity - this.data.discount
-
-wx.request({
-  url: '/api/order/create',
-  data: {
-    goodsId: this.data.goodsId,
-    quantity: this.data.quantity,
-    totalPrice: totalPrice  //  客户端传入金额
-  }
-})
-```
-
-**安全模式**：服务端重新计算
-```javascript
-// 安全：只传商品和数量，服务端计算价格
-wx.request({
-  url: '/api/order/create',
-  data: {
-    goodsId: this.data.goodsId,
-    quantity: this.data.quantity
-    //  不传价格，由服务端计算
-  }
-})
-```
-
-#### 2.2 检查点
-
-搜索订单创建/支付相关 API 的参数：
-- `totalPrice`, `amount`, `price`, `payAmount` → 客户端传入？
-- 是否只传 `goodsId` + `quantity`？
-- 是否有价格验证的服务端逻辑？
-
-### 3. 优惠券和折扣安全
-
-#### 3.1 客户端折扣计算
-
-**危险模式**：
-```javascript
-// 危险：客户端计算折扣后价格
-const discountPrice = originalPrice * this.data.discountRate
-
-wx.request({
-  url: '/api/order/create',
-  data: {
-    goodsId: goodsId,
-    discountPrice: discountPrice  //  客户端计算的折扣价
-  }
-})
-```
-
-**安全模式**：
-```javascript
-// 安全：传优惠券ID，服务端验证和计算
-wx.request({
-  url: '/api/order/create',
-  data: {
-    goodsId: goodsId,
-    couponId: this.data.selectedCoupon.id  //  只传优惠券ID
-  }
-})
-```
-
-#### 3.2 优惠券验证
-
-检查优惠券使用是否有：
-- 有效期验证
-- 使用次数限制
-- 商品适用范围
-- 用户资格检查
-- 防止重复使用
-
-### 4. 订单状态管理
-
-#### 4.1 订单状态机
-
-标准状态流转：
-```
-待支付 → 已支付 → 已发货 → 已完成
-         ↓
-       已取消/已退款
-```
-
-#### 4.2 状态跳转检查
-
-**危险模式**：客户端可直接修改订单状态
-```javascript
-// 危险：客户端传入状态
-wx.request({
-  url: '/api/order/update',
-  data: {
-    orderId: orderId,
-    status: 'paid'  //  客户端指定状态
-  }
-})
-```
-
-检查：
-- 订单状态是否可由客户端指定？
-- 状态跳转是否有服务端验证？
-- 关键状态（已支付、已发货）的修改权限
-
-### 5. 支付回调验证
-
-#### 5.1 客户端回调
-
-```javascript
-wx.requestPayment({
-  success: res => {
-    //  危险：依赖客户端回调确认支付
-    wx.request({
-      url: '/api/order/confirm',
-      data: { orderId: orderId, paid: true }
-    })
-  }
-})
-```
-
-**风险**：客户端可伪造 success 回调
-
-#### 5.2 服务端异步通知
-
-检查是否有：
-```javascript
-// 在订单创建时，应该有 notify_url
-{
-  "out_trade_no": "ORDER123",
-  "notify_url": "https://api.example.com/payment/callback"
-}
-```
-
-**检查点**：
-- 是否依赖客户端 success 回调？
-- 是否有服务端异步通知？
-- 异步通知是否验证签名？
-
-### 6. 重放和重复支付保护
-
-#### 6.1 订单号生成
-
-```javascript
-// 检查订单号生成逻辑
-const orderId = generateOrderId()
-
-// 是否有随机性？
-// 是否可预测？
-// 是否检查重复？
-```
-
-#### 6.2 幂等性保护
-
-检查订单接口：
-- 相同订单号的重复请求如何处理？
-- 已支付订单能否重复支付？
-- 是否有防重放 token？
-
-### 7. 金额字段类型检查
-
-#### 7.1 整数 vs 浮点数
-
-```javascript
-// 危险：使用浮点数
-const price = 19.99
-const total = price * quantity  // 可能有精度问题
-
-// 安全：使用分为单位的整数
-const priceInCents = 1999
-const total = priceInCents * quantity
-```
-
-检查：
-- 金额是否使用浮点数？
-- 是否有精度损失风险？
-- 计算是否正确四舍五入？
-
-### 8. 测试用例生成
-
-为每个风险生成测试用例：
-
-```json
-{
-  "test_case_id": "PAY-TC-001",
-  "type": "price_tampering",
-  "description": "篡改订单金额测试",
-  "steps": [
-    {
-      "action": "intercept_request",
-      "target": "POST /api/order/create",
-      "modify": {
-        "field": "totalPrice",
-        "from": 99.00,
-        "to": 0.01
-      }
-    },
-    {
-      "action": "check_response",
-      "expected": "服务端拒绝或重新计算价格",
-      "vulnerable_if": "接受篡改后的价格"
-    }
-  ]
-}
-```
-
-### 9. 输出结果
-
-生成 `evidence/payment-findings.json`：
-
-```json
-{
-  "skill": "payment-audit",
-  "scanned_at": "2024-01-01T12:00:00Z",
-  "source_dir": "...",
-  "payment_flow": {
-    "has_payment": true,
-    "payment_api": "wx.requestPayment",
-    "order_create_api": "/api/order/create",
-    "prepay_api": "/api/payment/prepay",
-    "callback_handling": {
-      "client_callback": true,
-      "server_notify": "unknown"
-    }
-  },
-  "findings": [
-    {
-      "finding_id": "PAY-001",
-      "type": "client_price_trust",
-      "severity": "CRITICAL",
-      "confidence": "HIGH",
-      "description": "客户端传入支付金额，服务端未重新计算",
-      "location": "pages/checkout/index.js:156",
-      "evidence": "totalPrice: this.data.totalPrice",
-      "vulnerable_code": "wx.request({\n  url: '/api/order/create',\n  data: {\n    totalPrice: this.data.totalPrice\n  }\n})",
-      "impact": "用户可篡改支付金额为 0.01 元",
-      "remediation": [
-        "只传商品 ID 和数量，由服务端计算价格",
-        "如必须传价格，服务端必须重新计算并对比"
-      ],
-      "test_case": {
-        "id": "PAY-TC-001",
-        "description": "抓包修改 totalPrice 为 0.01",
-        "expected": "服务端拒绝或使用正确价格",
-        "vulnerable_if": "接受 0.01 的订单"
-      }
-    },
-    {
-      "finding_id": "PAY-002",
-      "type": "client_callback_trust",
-      "severity": "HIGH",
-      "confidence": "MEDIUM",
-      "description": "依赖客户端 success 回调确认支付",
-      "location": "pages/payment/index.js:88",
-      "evidence": "wx.requestPayment({success: confirmOrder})",
-      "impact": "用户可伪造 success 回调，不付款获取商品",
-      "remediation": [
-        "使用服务端异步通知确认支付",
-        "客户端回调仅用于 UI 更新，不更改订单状态"
-      ]
-    },
-    {
-      "finding_id": "PAY-003",
-      "type": "coupon_validation",
-      "severity": "MEDIUM",
-      "confidence": "LOW",
-      "description": "优惠券折扣由客户端计算",
-      "location": "pages/checkout/index.js:201",
-      "evidence": "discountAmount: coupon.discount",
-      "impact": "用户可能篡改折扣金额",
-      "remediation": [
-        "只传优惠券 ID，服务端验证并计算折扣"
-      ]
-    }
-  ],
-  "statistics": {
-    "total_findings": 3,
-    "by_severity": {
-      "CRITICAL": 1,
-      "HIGH": 1,
-      "MEDIUM": 1
-    },
-    "by_type": {
-      "client_price_trust": 1,
-      "client_callback_trust": 1,
-      "coupon_validation": 1
-    }
-  }
-}
-```
-
-## 检查清单
-
-### 价格安全
-- [ ] 价格是否由服务端计算？
-- [ ] 客户端传入的价格是否重新验证？
-- [ ] 金额使用什么数据类型？（整数/浮点）
-
-### 优惠安全
-- [ ] 优惠券/折扣由谁计算？
-- [ ] 优惠券是否验证有效期？
-- [ ] 优惠券是否防重复使用？
-- [ ] 积分/余额抵扣是否验证？
-
-### 订单状态
-- [ ] 订单状态能否由客户端指定？
-- [ ] 关键状态变更是否有权限控制？
-- [ ] 订单号生成是否有随机性？
-
-### 支付回调
-- [ ] 是否依赖客户端 success 回调？
-- [ ] 是否有服务端异步通知？
-- [ ] 异步通知是否验证签名？
-
-### 防重放
-- [ ] 订单是否有幂等性保护？
-- [ ] 已支付订单能否重复支付？
-- [ ] 是否有防重放 token？
-
-### 微信支付 v3 回调
-- [ ] 是否在解密前验证 `Wechatpay-Signature`、`Wechatpay-Timestamp`、`Wechatpay-Nonce`、`Wechatpay-Serial`？
-- [ ] 验签是否使用平台证书/公钥，并按 serial 支持证书轮换？
-- [ ] 是否校验 `out_trade_no`、`transaction_id`、`mchid`、`appid` 与本地订单一致？
-- [ ] 是否校验 `amount.total` 与本地应付金额一致？
-- [ ] 是否按 `transaction_id` 幂等，重复回调返回成功但不重复入账？
-- [ ] 回调与主动查单/对账是否复用同一套校验？
-- [ ] 是否验证 timestamp 窗口并拒绝过期回调？
-- [ ] 是否避免在日志中记录完整回调报文和密钥？
-
-## 输出文件
-
-- `evidence/payment-findings.json` - 完整分析结果
-- `evidence/payment-test-cases.json` - 测试用例列表（可选）
+- 优先支付沙箱、测试商品与授权测试订单。真实扣款、退款、库存和发货必须在授权范围内；写清恢复办法与停止条件。
+- `findings[]` 使用统一 finding schema 与稳定 `F-001`，支付类别、相关端点、订单/交易证据均随发现记录。敏感订单和付款信息脱敏。
+- 显式选择 `needs_validation`、`confirmed` 或 `rejected`。候选可用 `priority` 排核实顺序；不按 amount 字段、客户端回调或支付关键词机械赋最终严重性，只有 `confirmed` 有 `severity`。
+- E0 是线索，E1 是有根据的待验证路径；E2 是可复现或可独立核验的直接证据证明具体边界失效；E3 是授权测试数据上进一步证实影响范围。静态/动态手段不决定等级。
+- 确认必须有 E2/E3、非空证据引用、根因、复现、实际影响、修复、预期与实际、复测条件。未执行的实验不能写成已观察结果，候选不能进入最终漏洞计数。
+- E2 已证明失效就停止扩展，不追求更多交易或更大金额。不存在支付能力或材料不足时如实说明覆盖范围，不编造空流程或“安全”结论。

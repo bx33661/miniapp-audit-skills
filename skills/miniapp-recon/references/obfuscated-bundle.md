@@ -1,66 +1,36 @@
-# Encrypted and Obfuscated Bundles
+# 加密包、bundle 与证据来源
 
-Read this when the package is encrypted, heavily minified, or the page files are missing while `app-service.js` is present.
+适用于加密、压缩混淆或没有独立页面 JS、但包含 `app-service.js` 的材料。先判断真实布局，再决定能够审计的范围。
 
-## V1MMWX packages
+## 容器与解包
 
-`V1MMWX` is a container format used by WeChat clients for cached packages. It is not a security boundary.
+- 某些微信客户端缓存使用 `V1MMWX` 容器；不能把所有缓存包都视为同一格式或同一加密版本。
+- 对支持该格式的工具，AppID 可能参与密钥派生，容器可能组合 AES-CBC 与单字节 XOR。以工具实际支持的格式和解析结果为准，不自行补造解密实现。
+- 解密后检查 wxapkg 标记、长度、文件索引与实际条目边界；单个 `0xBE` 字节不足以证明解密成功。
+- 记录原包和派生物哈希、工具版本、AppID 来源、命令与错误。保留原包，操作工作副本。
+- 失败时先核实 AppID、客户端格式和工具支持范围。没有依据时记录未核实或阻塞，不遍历无关 AppID。
 
-- Decryption derives a key from the mini program appid.
-- The header uses AES-CBC; the remainder uses a single-byte XOR.
-- A correct decryption starts with the standard wxapkg marker `0xBE`.
-- Record the tool, version and appid used; verify the decrypted header and file index.
-- Do not modify the original cache. Work on a copy.
+## 常见布局与盲区
 
-If decryption fails, confirm the appid and package version before trying another tool. Do not brute-force unrelated appids.
+- `app-config.json` 可能保存页面、分包、权限与插件配置；不要只搜索 `app.json`。
+- `app-service.js` 可能通过 `define` 注册模块；页面逻辑不一定在 `pages/*.js`。
+- `page-frame.js` 可能是运行时；`pages/*.html` 可能承载模板。区分平台代码、依赖与业务模块后记录实际覆盖。
+- 分包和插件可能按需交付。缺少独立文件只能证明本次材料未提供，不能证明线上没有业务或防护。
+- `sources` 与 `sourcesContent` 的索引、模块名和版本都要核对。部分或过期 source map 不能替代当前 bundle；未核实的映射不能用于精确位置证据。
 
-## Bundle layout
+## 隔离执行的适用条件
 
-A raw wxapkg unpack often contains:
+只有静态材料无法恢复关键配置或分支，且已获得相应执行授权时，才考虑执行未知 bundle：
 
-- `app-config.json` — the real page, subpackage, permission and plugin configuration.
-- `app-service.js` — application logic, often with modules registered through `define`.
-- `page-frame.js` — runtime/frame code.
-- `pages/*.html` — page templates; page logic may be in `app-service.js`, not in a separate `pages/*.js`.
+- 使用隔离 VM/容器、无网络、只读输入副本；不在分析工作站直接运行。
+- 只模拟加载所需的微信接口，不加载不可信依赖，不放入真实凭证、账号或个人信息。
+- 记录输入/输出哈希、环境版本、命令、模拟接口及其与真实环境的差异。
+- 出现网络、文件写入、进程或凭证访问尝试即停止并记录。
 
-Do not infer that a page has no logic because `pages/*.js` is absent. Check `app-service.js` and the `define` module table.
+观察到的分支依赖模拟环境时，写明限制。证据等级由证明力决定：E0 是线索；E1 是有根据但尚未证明边界失效的路径；E2 是可复现或可独立核验的直接证据，证明具体边界失效；E3 是在授权测试数据上进一步证实影响范围。不能将所有执行结果一律标为 E1，也不能把模拟分支当成真实后端行为。
 
-## Source maps
+## 产物衔接
 
-- `sourcesContent` may not align with `sources`; verify both indexes before trusting a mapping.
-- A map may contain only some modules or an older version.
-- Record whether a finding comes from original source, `sourcesContent`, or decompiled code.
+材料信息写入 `evidence/material-check.json`，遵循 [material-check-output.schema.json](../assets/material-check-output.schema.json)。记录真实材料类型、完整性状态、来源和覆盖限制；不增加独立格式的平行报告。
 
-## Sandbox execution (advanced, explicit exception)
-
-Executing an obfuscated bundle is an optional technique, not a default step. Use it only when static inspection cannot recover the configuration or a critical branch, and only with explicit authorization.
-
-Required conditions:
-
-- Isolated VM or container, never the analyst workstation.
-- No network access.
-- Read-only copy of the package.
-- Mock the `wx` runtime and only the APIs needed to load the bundle.
-- Do not install or load untrusted dependencies.
-- Hash the input and output; record commands and environment.
-- Do not use real accounts, tokens or personal data.
-- Stop if the bundle attempts network, file, process or credential access.
-
-The goal is to observe configuration, page registration, hidden fields and branch conditions. Treat the output as E1 evidence until verified against a live authorized environment.
-
-## Evidence
-
-Record:
-
-- Package version, appid, hash and decryption tool.
-- Original and decrypted hashes.
-- Bundle layout and the files actually inspected.
-- Sandbox commands and runtime versions, if used.
-- Which findings depend on decompiled or executed code.
-
-## Safety
-
-- Only analyze authorized packages.
-- Never execute untrusted code on the host.
-- Never put real credentials or user data into a sandbox.
-- Do not publish decrypted bundles or embedded keys.
+若发现需要后续核实的边界问题，向对应静态领域交接原始位置与材料哈希，保留稳定 `F-001` 编号及明确状态 `needs_validation`、`confirmed` 或 `rejected`。只有 E2/E3 且具备完整确认材料的 `confirmed` 才有最终严重性。获得足够 E2 证据后停止扩展影响，不发布解密包或嵌入密钥。

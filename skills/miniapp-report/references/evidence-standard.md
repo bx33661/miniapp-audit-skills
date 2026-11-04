@@ -1,68 +1,30 @@
-# Evidence Standard
+# 证据标准
 
-Evidence must let a reviewer understand what was tested, what was observed and how the conclusion was reached.
+证据应让复核者定位材料、理解预期控制与实际结果，并独立评估主张。
 
-## Evidence levels
+| 等级 | 含义 | 用途 |
+| --- | --- | --- |
+| E0 | 关键词、模式或其他线索 | 记录线索，不确认漏洞 |
+| E1 | 有根据的待验证路径，关键事实或边界结果尚未证明 | 待验证，写明缺失事实 |
+| E2 | 可复现或可独立核验的直接证据，证明具体边界失效 | 可支持 confirmed，仍需完整确认门 |
+| E3 | 在授权测试数据上进一步证实影响范围 | 支持已证明的影响范围，不扩大推断 |
 
-| Level | Definition | Report use |
-|---|---|---|
-| E0 | Keyword or pattern match without a code path | Observation only |
-| E1 | Static path with a missing guard, not dynamically verified | Pending or hypothesis |
-| E2 | Dynamic reproduction with a controlled request and response | Confirmed finding |
-| E3 | E2 plus demonstrated impact on data, money, privilege or state | Confirmed finding with impact |
+证据强度不等于静态或动态手段。可独立核验的源码与配置可能达到 E2；缺少前提、对照或结果的动态响应也可能只达到 E1。达到 E2 即停止为追求等级而扩大影响。
 
-## Required fields
+## 记录契约
 
-Each evidence record contains:
+每条 evidence 必须包含 evidence_id、真实 source_skill、collected_at、type、artifact.file 和实际非空 content_redacted。source_skill 仅可为 miniapp-audit、miniapp-recon、miniapp-threat-model、miniapp-static-audit、miniapp-dynamic、miniapp-report。
 
-- Evidence identifier and finding identifier.
-- Target, environment, account role and timestamp.
-- Tool and version used to capture or replay.
-- Exact request: method, URL, headers and body, with secrets redacted.
-- Exact response: status, headers and relevant body, with personal data redacted.
-- Baseline request and response, when a mutation is involved.
-- Reproduction steps that another tester can follow.
-- Observed result and expected secure behavior.
-- Evidence level and residual uncertainty.
-- Retention and deletion status.
+artifact.file 定位源码或受限证据制品；JSON 记录可附 artifact.locator（JSON Pointer、请求记录号或测试编号），源码可附 line_start/line_end，导出制品可附 SHA256 hash。HTTP 发现不需要伪造源码行号。时间、环境、账号角色、工具版本与执行限制按实际记录在 metadata 中。最终证据数组中的 ID 必须唯一，finding.evidence_refs 必须能解析到它。
 
-## Reproducibility
+content_redacted 必须含真实代码、配置、请求响应或工具输出摘录，不能只有文件路径、“已脱敏”或未填写模板。schema 能拒绝缺失、空文本与纯空白；摘录是否真实、相关且足以支撑结论仍需人工核验。
 
-A reviewer should be able to:
+## 最小充分证据
 
-1. Identify the affected asset.
-2. Recreate the precondition and account role.
-3. Send the same request.
-4. Observe the same class of result.
-5. Understand why the result is a security failure.
+记录受影响资产、角色与前置条件、验证方法、复现步骤、预期安全行为、实际结果及残余未知。HTTP 实验保留脱敏请求与相关响应；变更请求需有对照基线。源码分析保留跨边界调用路径、控制位置与可独立核验的失效依据。记录失败尝试、丢失或截断材料，不能只保留支持主张的部分。
 
-If the result depends on a race, time window or one-time token, state that explicitly and record the number of attempts.
+确认发现的 reproduction、verification.test_case.expected/actual 应与证据一致；retest 写具体步骤及通过判据，尚未复测必须说明，不虚构已通过。涉及竞态、时窗或一次性状态时写明实际尝试条件和次数。
 
-## Redaction
+## 脱敏、完整性与保留
 
-- Remove or mask tokens, cookies, authorization headers and API keys.
-- Mask personal data: names, phone numbers, identity numbers, addresses, student or employee identifiers.
-- Keep enough context to prove the issue without exposing the data.
-- Store unredacted evidence only when necessary and in a restricted directory.
-
-## Retention
-
-- Define a retention period before testing.
-- Delete raw personal data when it is no longer needed.
-- Keep a minimal reproduction and the report.
-- Record the deletion in the audit log.
-
-## Integrity
-
-- Record hashes for exported artifacts where practical.
-- Do not edit raw evidence; create derived, redacted copies.
-- Keep timestamps and tool versions.
-- Note any evidence that was lost, truncated or could not be captured.
-
-## Anti-patterns
-
-- A screenshot without the request or reproduction steps.
-- A response body without the request that produced it.
-- A pattern match presented as a confirmed vulnerability.
-- A finding that depends on data from another user without a test account.
-- A report that omits failed attempts and limitations.
+删除或掩码密钥、Token、Cookie、认证头及个人信息，保留证明边界所需的最少结构和角色差异。仅使用授权测试数据，不扩大影响。原始证据若确有保留必要，置于受限目录；报告引用脱敏副本并记录保留期限、删除要求和实际删除情况。保留时间戳及可获得的制品哈希，不修改原始证据；派生副本应能追溯来源。

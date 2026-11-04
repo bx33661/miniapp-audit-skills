@@ -1,42 +1,21 @@
 {
   "target": {
-    "base_url": "https://test-api.example.com",
-    "environment": "test"
+    "base_url": "https://authorized.example.invalid",
+    "environment": null
   },
   "authorization": {
-    "scope": "read-only",
-    "approved_by": "",
-    "expires_at": ""
+    "scope": ["capture", "read-only replay"],
+    "approved_by": null,
+    "expires_at": null
   },
-  "accounts": [
-    {
-      "role": "user_a",
-      "identifier": "test_user_a",
-      "notes": ""
-    },
-    {
-      "role": "user_b",
-      "identifier": "test_user_b",
-      "notes": ""
-    }
-  ],
+  "accounts": [],
+  "allowed_operations": [],
   "rate_limit": {
-    "max_total_requests": 200,
-    "max_requests_per_second": 2
-  },
-  "blacklist": {
-    "paths": [
-      "/payment/refund",
-      "/admin/delete"
-    ]
+    "max_total_requests": null,
+    "max_requests_per_second": null
   },
   "data_handling": {
-    "redact": [
-      "token",
-      "cookie",
-      "phone",
-      "id_card"
-    ],
-    "retention_days": 7
+    "redact": ["authorization", "token", "cookie", "phone", "id_card"],
+    "retention_days": null
   }
 }

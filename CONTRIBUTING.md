@@ -34,21 +34,24 @@ skills/<name>/
 
 ## 脚本
 
-脚本只用于高频、确定性强、手工容易出错的提取任务。不要为脱敏、简单字段映射、严重性判断或质量门检查添加脚本；这些由指令和 reference 承担。
+提取器、计划准备、网络传输和证据校验各自保持明确职责。提取与校验离线；动态执行器只向显式 scope 发送已授权请求。严重性、证据证明力和业务影响由分析者判断，不写成关键字评分公式。
 
-- 使用 Python 标准库或明确声明依赖。
-- 不发起网络请求，不修改目标系统。
+- 提取器使用 Python 标准库；动态执行依赖在技能 requirements.txt 声明，开发依赖复用它。
+- 保留实际请求字节、身份隔离与 wire/解码视图区别；拒绝静默改协议、自动重试或跳转，不执行目标脚本。
 - 支持 `--help`，错误信息说明具体问题和可选值。
 - 不接受交互式输入；所有参数通过命令行、环境变量或 stdin 传入。
-- 为正常路径和失败路径添加 fixture 测试。
+- 为会导致漏报、误确认或错误覆盖声明的正常与失败路径添加行为回归，避免测试源码文本或模板措辞。
 
 ## 验证
 
 提交前运行：
 
 ```bash
-python3 scripts/validate_skills.py
+python3 -m pip install -r requirements-dev.txt
+python3 scripts/validate_skills.py --strict
 python3 scripts/check_links.py
+python3 -m unittest discover -s evals -p 'test_*.py'
+python3 evals/run_scenarios.py --output-dir /path/to/new-scenario-output
 ```
 
 如已安装官方 `skills-ref`：
@@ -56,6 +59,8 @@ python3 scripts/check_links.py
 ```bash
 for d in skills/*/; do skills-ref validate "$d"; done
 ```
+
+最终产物用 `python3 scripts/validate_outputs.py --evidence-dir <dir>` 离线验证；执行器制品追加 --verify-artifacts 核对本地文件和 SHA256。通过校验仍需复核证据内容。场景回归依据实际本地服务端观察，不能冒充真实微信客户端兼容性或模型审计准确率。
 
 ## Pull request 检查
 

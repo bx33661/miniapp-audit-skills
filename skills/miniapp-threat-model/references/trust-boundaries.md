@@ -1,6 +1,6 @@
 # Trust Boundaries
 
-A trust boundary is a place where data or authority crosses from a less trusted context into a more trusted one. For mini programs, the client is always the less trusted side.
+A trust boundary is where data or authority crosses contexts. Identify the receiving decision, the less trusted input and the specific protected asset; privacy collection, credentials and bridge calls also have their own controls.
 
 For each boundary, ask:
 
@@ -36,7 +36,7 @@ For each boundary, ask:
 | Are database rules least-privilege? | Collection readable or writable by all users | Query another user's records with a low-privilege account |
 | Are storage paths isolated per user? | File IDs enumerable or shared | Access another user's file ID |
 | Is one function handling multiple operations? | Create/read/update/delete share one authorization path | Call an operation the role should not perform |
-| Is the environment ID or admin credential exposed? | Client contains cloud env or secret | Inspect client bundle and configuration |
+| Are published identifiers distinguished from privileged credentials? | A real server credential is exposed with demonstrable authority | Inspect its actual purpose and exposure; an environment ID alone is not a secret |
 
 ## Backend to payment and third parties
 
@@ -62,5 +62,5 @@ For each boundary, ask:
 - Every critical flow crosses at least one boundary.
 - Every boundary has a named verification point.
 - Every verification point has an evidence requirement.
-- Client-side checks are treated as UX, not security.
+- Client-supplied identity or privilege cannot replace server authorization; client-side privacy collection and bridge controls still require review.
 - Missing boundaries are recorded as limitations, not assumed secure.

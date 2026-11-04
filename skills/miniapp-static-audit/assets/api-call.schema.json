@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://wxray.dev/schemas/api-call.schema.json",
   "title": "API Call",
   "description": "API 调用记录",
   "type": "object",
@@ -18,12 +17,24 @@
     },
     "method": {
       "type": "string",
-      "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "CALL"],
-      "description": "HTTP 方法或云函数 CALL"
+      "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "CALL", "UNKNOWN"],
+      "description": "已识别的方法；未解析或无法确定时为 UNKNOWN"
     },
     "url": {
       "type": "string",
-      "description": "完整 URL 或云函数名称"
+      "description": "静态 URL 或保留的动态表达式；未知时结合 url_expression 和 limitations 复核"
+    },
+    "url_expression": {
+      "type": ["string", "null"],
+      "description": "调用点原始表达式，不执行 JavaScript 求值"
+    },
+    "dynamic": {
+      "type": "boolean",
+      "description": "是否需要运行时值或进一步解析；false 不代表输入可信"
+    },
+    "call": {
+      "type": "string",
+      "description": "识别到的调用名称"
     },
     "url_pattern": {
       "type": "string",

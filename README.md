@@ -1,190 +1,120 @@
 # MiniApp Audit Skills
 
-面向 Agent 的微信小程序安全审计技能集。核心是审计思想、信任边界和证据标准，而不是把审计写成僵化的步骤清单。
+面向 Agent 的微信小程序安全审计技能集。支持从运行流量、源码或已有证据独立开始；解包是按需补充材料的能力。
 
-## 设计原则
+## 工作方式
 
-- **审计思想优先。** 技能提供问题、判断标准和取舍，不替代分析。
-- **证据优先。** 模式匹配只是假设；只有可复现的行为才能写成已确认漏洞。
-- **业务语境优先。** 先理解角色、资产、资金流和状态机，再选择测试方法。
-- **渐进披露。** 主文件只保留每次都会用到的流程；细节放在 `references/`，模板放在 `assets/`。
-- **最小影响。** 默认只读；不执行真实支付、退款、删除或权限变更。
-- **规范兼容。** 目录名与 `name` 一致；`allowed-tools` 使用空格分隔字符串；元数据值为字符串。
+- 先理解页面、组件、分包、登录、请求封装和可信服务之间的关系，再选择检查方法。
+- 只有运行中的小程序与授权账号时，直接进行代理抓包、真实请求重放和多身份测试，无需 wxapkg 或静态发现。
+- 有代码时追踪实际路径和安全控制；没有后端实现时不编造服务端缺失校验。
+- 线索、待验证、确认与排除分开；确认必须有足够证据，严重性只反映已证明影响。
+- 未执行、无法解析、缺材料和测试受阻都保留限制，不解释为安全或零发现。
 
 ## 技能
 
-| Skill | 用途 | 主要产出 |
+| Skill | 独立用途 | 主要产出 |
 |---|---|---|
-| `miniapp-audit` | 规划与编排审计，维护质量门 | 审计会话、范围、覆盖与结论 |
-| `miniapp-recon` | 获取、解密、解包并盘点材料 | 资产清单、完整性与限制 |
-| `miniapp-threat-model` | 建模业务、角色、状态与信任边界 | 威胁模型、滥用用例、测试计划 |
-| `miniapp-static-audit` | 审查攻击面、凭证、数据流、鉴权、支付、隐私与供应链 | E0/E1 假设与测试用例 |
-| `miniapp-dynamic` | 用 Reqable 抓包，重放与改参验证 | E2/E3 证据与复现步骤 |
-| `miniapp-report` | 归一化证据，评级并生成报告 | 发现、覆盖率、修复与复测标准 |
+| miniapp-audit | 确定范围、选择入口、维护证据与覆盖要求 | 会话、范围和覆盖记录 |
+| miniapp-recon | 核实已有材料，按需获取或解包 | 声明结构、来源与未知项 |
+| miniapp-threat-model | 建模角色、资产、业务状态和边界 | 滥用用例与验证计划 |
+| miniapp-static-audit | 审查实际代码、配置和调用路径 | 假设、直接证据和测试思路 |
+| miniapp-dynamic | 从流量开始，或验证已有请求/假设 | 实际捕获、重放与对照结果 |
+| miniapp-report | 整理任何来源的审计证据与复测标准 | 稳定发现、证据和覆盖说明 |
 
-## 审计循环
-
-```text
-范围与授权
-  → 材料与资产
-  → 业务与威胁建模
-  → 静态分析（假设）
-  → 动态验证（证据）
-  → 报告与修复
-  → 复测与关闭
-```
-
-循环是迭代的。发现可能要求回到建模、补材料或重新设计测试。
+这些阶段按任务组合，不要求每次串行执行。理解运行结构时读 [runtime-model.md](skills/miniapp-audit/references/runtime-model.md)，身份、渲染、分包和工具疑点按 [平台案例](skills/miniapp-audit/references/platform-cases.md) 定位；独立抓包流程见 [traffic-testing.md](skills/miniapp-dynamic/references/traffic-testing.md)。
 
 ## 安装
 
-### 方式一：skills CLI（推荐）
+推荐使用 skills CLI，并安装整套六个技能以保留共享 reference：
 
 ```bash
 npx skills add bx33661/miniapp-audit-skills
 ```
 
-该命令适用于支持 Agent Skills 的客户端，包括 Claude Code、Codex、Cursor 等。安装时选择本仓库的六个技能。
-
-### 方式二：Claude Code 插件市场
+Claude Code 插件市场：
 
 ```text
 /plugin marketplace add bx33661/miniapp-audit-skills
 /plugin install miniapp-audit@miniapp-audit-skills
 ```
 
-### 方式三：手动安装
-
-将 `skills/` 下的六个技能目录复制到客户端使用的技能目录。以下命令在仓库根目录执行；克隆位置按实际路径替换。
+手动安装时，在仓库根目录将六个技能目录复制到客户端技能根目录：
 
 ```bash
 # 项目级 Claude Code
 mkdir -p .claude/skills
 cp -R skills/miniapp-* .claude/skills/
 
-# 用户级 Claude Code
-mkdir -p ~/.claude/skills
-cp -R skills/miniapp-* ~/.claude/skills/
-
 # 跨客户端约定
 mkdir -p .agents/skills
 cp -R skills/miniapp-* .agents/skills/
 ```
 
-注意：
+复制技能目录本身，不额外包一层命名空间。用户级 Claude Code 可使用 ~/.claude/skills。技能会以 Agent 权限工作，安装前应审阅入口、引用与脚本。
 
-- 复制的是 `skills/miniapp-*` 这些**技能目录**，不是仓库根目录。
-- 每个技能目录必须直接位于技能根目录下，并包含 `SKILL.md`。
-- 不要保留额外的命名空间层级，否则部分客户端无法发现技能。
-
-### 验证安装
-
-```bash
-ls .claude/skills
-# 应看到六个 miniapp-* 目录
-
-# 在仓库内
-python3 scripts/validate_skills.py
-
-# 在目标项目中验证手动安装
-python3 /path/to/miniapp-audit-skills/scripts/validate_skills.py --root .claude/skills
-```
-
-如已安装官方 `skills-ref`：
-
-```bash
-skills-ref validate skills/miniapp-audit
-```
-
-### 安全提示
-
-技能以 Agent 权限运行。安装前审阅 `SKILL.md`、`references/` 和 `scripts/`，不要安装来源不明的第三方技能。
-
-本仓库的脚本只使用 Python 标准库，不发起网络请求：`inventory.py` 和 `extract_endpoints.py` 只读取本地文件；抓包、重放、脱敏和报告质量门由 Agent 按 reference 执行。
-
-## 使用
-
-技能会根据描述自动触发；也可以显式指定：
+## 使用示例
 
 ```text
-使用 miniapp-audit 规划这次小程序审计，材料在 /path/to/wxapkg。
-使用 miniapp-recon 解包并生成资产清单。
-使用 miniapp-threat-model 对登录、下单和支付流程建模。
-使用 miniapp-static-audit 审查越权、支付逻辑和隐私声明。
-使用 miniapp-dynamic 通过 Reqable 抓包并验证越权假设。
-使用 miniapp-report 汇总证据并生成报告。
+使用 miniapp-dynamic 对这个运行中的小程序抓包并实际重放请求；我有授权测试账号，没有源码。
+使用 miniapp-dynamic 验证这条请求的对象归属，使用两个授权测试账号。
+使用 miniapp-static-audit 审查这份源码中的登录、支付和云函数调用。
+使用 miniapp-recon 核实这份 wxapkg 材料的主包、分包和插件。
+使用 miniapp-report 整理已有证据，保留未验证项和覆盖限制。
+使用 miniapp-audit 规划完整审计，并根据现有材料选择入口。
 ```
 
-一次典型审计：
+导出 curl 或创建请求标签只是准备。动态技能要求实际发送、读取响应并保存证据，分别说明捕获、重放、安全对照和阻塞的完成情况。没有提供目标或运行条件时不能编造流量。
 
-1. `miniapp-audit` 明确范围、授权和质量门。
-2. `miniapp-recon` 建立可信的材料基线，记录缺失项。
-3. `miniapp-threat-model` 识别资产、角色、状态和滥用路径。
-4. `miniapp-static-audit` 生成有文件、行号和数据流的假设。
-5. `miniapp-dynamic` 在真实小程序中重放与改参，形成 E2/E3 证据。
-6. `miniapp-report` 区分已确认、待确认和未测试，给出修复与复测标准。
+## 实际请求执行
 
-## 仓库结构
+内置执行器按显式计划发送 HTTP/1.1 请求，支持 HTTP/HTTPS、显式 HTTP 代理与 HTTPS CONNECT、受信 CA、隔离账号和 CookieJar。用 [双账号计划示例](skills/miniapp-dynamic/assets/replay-plan-example.json) 组织正常基线与跨对象对照；凭证从指定环境变量读取，不能把示例当作目标协议。
 
-```text
-.
-├── skills/
-│   ├── miniapp-audit/
-│   │   ├── SKILL.md
-│   │   ├── references/
-│   │   └── assets/
-│   ├── miniapp-recon/          # SKILL.md, references/, scripts/, assets/
-│   ├── miniapp-threat-model/   # SKILL.md, references/
-│   ├── miniapp-static-audit/   # SKILL.md, references/, scripts/, assets/
-│   ├── miniapp-dynamic/        # SKILL.md, references/, assets/
-│   └── miniapp-report/         # SKILL.md, references/, assets/
-├── .github/
-│   └── workflows/
-│       └── validate.yml
-├── evals/
-│   └── trigger-queries.csv
-├── docs/
-│   └── design.md
-├── scripts/
-│   ├── validate_skills.py
-│   └── check_links.py
-├── .claude-plugin/
-│   └── marketplace.json
-├── README.md
-├── CONTRIBUTING.md
-├── SECURITY.md
-├── CHANGELOG.md
-└── LICENSE
+```bash
+python3 -m pip install -r skills/miniapp-dynamic/requirements.txt
+python3 skills/miniapp-dynamic/scripts/replay.py --plan /path/to/plan.json --output-dir /path/to/new-evidence
+python3 scripts/validate_outputs.py --evidence-dir /path/to/new-evidence --verify-artifacts
 ```
 
-每个技能以独立目录组织。部分技能会引用套件内的共享方法论，因此建议整套安装；跨阶段的协作通过输入和输出数据完成。
+已知协议可使用明确规范的 HMAC-SHA256 派生头和 AES-GCM 请求/响应适配；重复 form/query、原始 multipart 和二进制可按实际字节保留。具体格式、账号失效、退出码与工具边界见 [执行指引](skills/miniapp-dynamic/references/execution.md)。未知签名、协议或缺凭证明确受阻，不自动套用或伪造成功。
 
-审计脚本只保留两个确定性提取器：`inventory.py` 和 `extract_endpoints.py`。请求归一化、脱敏、严重性判断和覆盖检查由 Agent 按 reference 和质量门执行，不再提供低级辅助脚本。
+每次实际尝试保存脱敏制品与 SHA256，replay-run.json 区分收到响应、传输失败和未发送；只有完整响应与协议期望都成立才记重放成功。执行器不自行判断漏洞，初始 findings 为空也不代表安全。输出目录独占创建，避免覆盖已有证据。
 
-## 质量与验证
 
-- `scripts/validate_skills.py` 检查 frontmatter、名称与目录、描述、`allowed-tools`、元数据、代码围栏、断链和正文长度。
-- `scripts/check_links.py` 检查 README、docs 和 skills 中的相对链接。
-- GitHub Actions 在 push 和 pull request 时运行两个检查脚本。
-- 官方 `skills-ref` 用于验证 Agent Skills 规范兼容性。
-- 新增或修改技能后，至少运行一次本地验证。
-- 发现应通过证据分级：E0/E1 为假设，E2/E3 为已确认。
-- 报告应区分已确认、待确认和未测试，并给出复测标准。
-- `evals/trigger-queries.csv` 提供 24 条触发测试，覆盖六个技能和负样本。
+## 输出契约
 
-## 环境要求
+- 最终 findings.json 和 evidence.json 都是数组；发现 ID 使用稳定 F-001，证据使用 EV-001，排序不重编。
+- 发现状态只有 confirmed、needs_validation、rejected，没有默认确认状态。候选使用 priority，仅 confirmed 可以有 severity。
+- E0 是线索，E1 是有根据的待验证路径，E2 是直接证明具体失效的证据，E3 进一步证明授权测试数据上的影响范围；证据强度不按静态/动态工具划分。
+- 鉴权、支付、数据流与隐私记录复用统一 finding schema。密钥原始候选保留 secrets，不能凭格式命中直接确认。
+- 动态输出包含 entry_mode、requests、findings 与 limitations，区分从流量开始和已有假设。成功重放必须有实际发送与响应的证据引用。
+- 结构清单 COMPLETE 只表示已检查的声明结构齐备；未核实的质量状态为 UNKNOWN，未识别计数为 null。
 
-- 支持 Agent Skills 的客户端。
-- Node.js 18 或更高版本，用于 `npx skills` 和 JavaScript 分析工具。
-- Python 3.10 或更高版本，用于本地验证脚本。
-- 可选工具：WxLocated、unveilr、wxappUnpacker、微信开发者工具、Reqable、Yakit、Frida。
+详细字段以 skills 内 schema 为准。新契约移除了旧状态、字段别名、自动风险分数和 JS 报告模板表达式；已有产物需要按当前契约重新整理。
 
-## 范围与限制
+## 验证
 
-- 仅用于获得明确授权的安全测试。
-- 默认只读；支付、退款、删除和权限变更仅在受控测试环境中进行。
-- 工具版本、平台能力和微信规范会变化；使用前核对官方文档。
-- 本仓库不构成法律意见，也不保证通过平台审核。
+材料与接口提取器只使用 Python 标准库并离线读取；动态执行器使用其技能 requirements.txt 中声明的依赖，开发依赖复用该文件。校验器只读取本地 schema 与证据：
+
+```bash
+python3 -m pip install -r requirements-dev.txt
+python3 scripts/validate_skills.py --strict
+python3 scripts/check_links.py
+python3 -m unittest discover -s evals -p 'test_*.py'
+python3 scripts/validate_outputs.py --evidence-dir /path/to/evidence
+python3 evals/run_scenarios.py --output-dir /path/to/new-scenario-output
+```
+
+输出校验器离线检查阶段产物、最终数组、条件必填字段、ID 和引用；追加 --verify-artifacts 核对 bundle 内真实文件与 SHA256，不请求 schema URL。通过校验不能代替判断证据真实性与影响。
+
+CI 运行格式、链接与行为回归。真实本地 HTTP/HTTPS 与代理场景检查安全/有问题/受阻、账号隔离、签名、加密与字节保真，运行后保留逐项观察和 summary.json。场景使用方式与独立 Agent 任务入口见 [评测说明](evals/README.md)。这些结果不等于真实微信兼容性或模型审计准确率；trigger-queries.csv 仍只是触发评测输入。
+
+## 环境与边界
+
+需要支持 Agent Skills 的客户端。CLI 安装需要 Node.js；本地脚本需要 Python 3.10+。解包、开发者工具、Reqable 或其它代理按任务选用，依赖实际版本能力。
+
+仅测试已授权目标与账号。生产默认只读，状态变更需要明确许可、受控环境与回滚方案；不执行真实资金操作或未经授权的删除与权限变更。共享前脱敏，并按约定保留或删除原始证据。
+
+维护约定见 CONTRIBUTING.md，设计约束见 docs/design.md，安全政策见 SECURITY.md。
 
 ## License
 

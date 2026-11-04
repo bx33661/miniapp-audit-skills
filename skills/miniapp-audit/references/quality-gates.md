@@ -1,68 +1,16 @@
-# Quality Gates
+# 交接质量门
 
-Quality gates prevent an audit from producing confident but unsupported conclusions. Apply them before analysis, before confirmation and before reporting.
+在阶段交接或结论复核时使用。证据定义以 `methodology.md` 为准。
 
-## Gate definitions
+| 检查 | 通过条件 | 不满足时 |
+|---|---|---|
+| 范围 | 目标、环境、账号、允许操作与数据规则可确认 | 不发送未授权请求 |
+| 材料 | 声明结构、来源与未知项可追溯 | 限定结论，缺决定性材料则阻塞相关主张 |
+| 实验 | 正常基线成立，改动与身份明确，预期与实际可比较 | 保留 INCONCLUSIVE 或 BLOCKED |
+| 确认 | E2/E3，具体资产与失效边界，复现和非空证据引用完整 | 保留 needs_validation |
+| 覆盖 | 已测有证据，部分/未测有原因和残余风险 | 不宣称完整覆盖 |
+| 报告 | 状态、证据与严重性一致；ID 稳定；引用可解析 | 修正契约，不能用空数组掩盖读取失败 |
 
-| Gate | Question | Pass criteria | Failure handling |
-|---|---|---|---|
-| Authorization | Is the target authorized, and are the rules of engagement explicit? | Written scope, accounts, environment, time window, data rules | Stop; do not test |
-| Material | Is the material complete enough to support the conclusion? | Main package, subpackages, plugins and versions accounted for; missing items recorded | Limit conclusions or stop |
-| Coverage | Is the tested surface explicit? | Every asset type marked tested, partial or not tested, with a reason | Do not claim comprehensive coverage |
-| Evidence | Is the finding confirmed or still a hypothesis? | E2/E3 for confirmed; E0/E1 labeled as hypothesis | Downgrade or verify |
-| Report | Can a reviewer reproduce and act on the finding? | Root cause, reproduction, impact, remediation, references, evidence level | Return for completion |
-| Compliance | Did testing avoid unauthorized access and destructive changes? | No other users' data, no real payments, no destructive writes | Stop and record |
+发现格式符合 schema 不等于内容真实。复核者仍需判断证据是否相关、是否证明了主张，以及影响是否超出了观察结果。
 
-## Material gate
-
-Check before static or dynamic conclusions:
-
-- `app.json` and `app.js` are present or their absence is explained.
-- Declared subpackages and plugins are present or marked missing.
-- Client version, account and artifact hashes are recorded.
-- Encrypted or failed packages are recorded as limitations.
-
-A conclusion about a flow that lives in a missing subpackage is not supported.
-
-## Coverage gate
-
-Mark each asset type:
-
-- `tested`: exercised with evidence.
-- `partial`: some paths or roles tested; state what is missing.
-- `not tested`: not exercised; state why.
-
-Asset types include HTTP APIs, WebSocket, cloud functions, cloud database/storage, web-view, plugins, payment, local storage, navigation and QR entry points.
-
-## Evidence gate
-
-- E0: pattern or keyword only. Not a finding.
-- E1: static path and missing guard. Hypothesis; requires verification.
-- E2: dynamic reproduction. Confirmed.
-- E3: demonstrated impact. Confirmed with impact evidence.
-
-A confirmed finding must include the exact request or steps, the observed response and the expected secure behavior.
-
-## Report gate
-
-Every reportable finding must answer:
-
-1. What is the affected asset?
-2. What does the client control?
-3. Which server-side or cloud-side check is missing?
-4. How can the issue be reproduced?
-5. What is the impact?
-6. How should it be fixed?
-7. What evidence level supports the conclusion?
-8. What was not tested that could change the conclusion?
-
-## Compliance gate
-
-Stop immediately if testing:
-
-- Requires another user's credentials or personal data.
-- Would execute a real payment, refund, deletion or privilege change.
-- Causes instability, data loss or service degradation.
-- Exceeds the authorized scope or rate limits.
-
-Record the stop condition and the minimum evidence collected.
+CWE/OWASP 仅在适用时映射，不为凑字段编造编号。最小证据已成立即停止；发现真实他人数据、生产状态变化或不稳定时停止测试。
