@@ -61,6 +61,7 @@ allowed-tools: Bash Read Write
 
 - 确定证据等级或覆盖方式时读 `references/methodology.md`。
 - 阶段交接与结论复核时读 `references/quality-gates.md`。
+- 跨会话、压缩风险或并行交接时，可选读 `references/blackboard.md`；不启用不影响审计。
 - 已有确认发现、需要评级时读 `references/severity.md`。
 
 ## 执行边界

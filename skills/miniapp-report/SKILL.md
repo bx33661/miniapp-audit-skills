@@ -35,6 +35,8 @@ allowed-tools: Read Write Bash
 
 动态结果仅有 `CONFIRMED`、`INCONCLUSIVE`、`BLOCKED`、`FALSE_POSITIVE`，实验结果不等于最终发现状态或严重性。成功实验仍须满足确认门；受阻或不确定应记录缺失事实；排除必须给出针对原主张的反证理由。
 
+可从 blackboard 导出的候选和证据关系作为输入；最终 findings/evidence 仍按本技能 schema 归一化，黑板 confidence 不是报告状态。
+
 ## 工作流
 
 1. 按 `references/report-builder.md` 加载输入，区分缺失、解析失败、结构无效和成功读取的空数组。
